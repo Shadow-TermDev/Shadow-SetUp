@@ -7,7 +7,7 @@ Setup automático para Termux — zsh + Oh My Zsh + Powerlevel10k + plugins y do
 - **zsh** como shell principal
 - **Oh My Zsh** con tema Powerlevel10k (classic)
 - **Plugins:** `zsh-autosuggestions`, `zsh-syntax-highlighting`, `fzf`, `python`, `git`
-- **Herramientas:** `eza`, `bat`, `fd`, `fzf`, `zoxide`, `proot-distro`, `termux-api`
+- **Herramientas:** `eza`, `bat`, `fd`, `fzf`, `zoxide`, `termux-api`
 - **Dotfiles:** `.zshrc`, `.p10k.zsh`, `colors.properties`, `termux.properties`
 - Saludo kawaii por TTS al abrir la terminal 🎀
 
