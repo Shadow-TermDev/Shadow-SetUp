@@ -26,22 +26,27 @@ fail() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 # -----------------------------------------------
 clear
 echo -e "${CYAN}${BOLD}"
-cat <<'EOF'
-  _____                              ____       _
- |_   _|__ _ __ _ __ ___  _   ___  / ___|  ___| |_ _   _ _ __
-   | |/ _ \ '__| '_ ` _ \| | | \ \| |     / _ \ __| | | | '_ \
-   | |  __/ |  | | | | | | |_| |> | |___ |  __/ |_| |_| | |_) |
-   |_|\___|_|  |_| |_| |_|\__,_/_/ \____(_)___|\__|\__,_| .__/
-                                                          |_|
-EOF
+echo -e "  ╔══════════════════════════════════╗"
+echo -e "  ║       🖤  Shadow-SetUp  🖤       ║"
+echo -e "  ╚══════════════════════════════════╝"
 echo -e "${NC}"
-echo -e "${BOLD}  zsh + Oh My Zsh + Powerlevel10k + Plugins${NC}"
-echo -e "  ─────────────────────────────────────────"
+echo -e "  ${BOLD}zsh · Oh My Zsh · Powerlevel10k${NC}"
+echo -e "  ${BOLD}Plugins · Fuentes · Dotfiles${NC}"
 echo ""
 
 # -----------------------------------------------
-# 1. Actualizar paquetes
+# 1. Borrar motd (mensaje de bienvenida por defecto)
 # -----------------------------------------------
+MOTD="/data/data/com.termux/files/usr/etc/motd"
+if [ -f "$MOTD" ]; then
+    rm -f "$MOTD"
+    ok "motd eliminado"
+else
+    warn "motd no encontrado, omitiendo..."
+fi
+
+# -----------------------------------------------
+# 2. Actualizar repositorios
 info "Actualizando repositorios..."
 pkg update -y && pkg upgrade -y
 ok "Repositorios actualizados"
