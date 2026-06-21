@@ -29,7 +29,7 @@ Shadow-SetUp/
 
 ```bash
 pkg install git -y
-git clone https://github.com/TU_USUARIO/Shadow-SetUp.git ~/Shadow-SetUp
+git clone https://github.com/Shadow-TermDev/Shadow-SetUp.git ~/Shadow-SetUp
 cd ~/Shadow-SetUp
 chmod +x setup.sh
 bash setup.sh
