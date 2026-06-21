@@ -402,7 +402,25 @@ if command -v termux-reload-settings &>/dev/null; then
 fi
 
 # -----------------------------------------------
-# 9. Cambiar shell a zsh
+# 9. Instalar fuente MesloLGS NF (para Powerlevel10k)
+# -----------------------------------------------
+FONT_PATH="$HOME/.termux/font.ttf"
+FONT_URL="https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf"
+
+if [ -f "$FONT_PATH" ]; then
+    warn "font.ttf ya existe, omitiendo..."
+else
+    info "Descargando MesloLGS NF..."
+    if curl -fsSL "$FONT_URL" -o "$FONT_PATH"; then
+        ok "Fuente MesloLGS NF instalada en ~/.termux/font.ttf"
+    else
+        warn "No se pudo descargar la fuente — instálala manualmente desde:"
+        warn "https://github.com/romkatv/powerlevel10k#meslo-nerd-font-patched-for-powerlevel10k"
+    fi
+fi
+
+# -----------------------------------------------
+# 10. Cambiar shell a zsh
 # -----------------------------------------------
 info "Configurando zsh como shell predeterminado..."
 if [ "$SHELL" != "$(which zsh)" ]; then
@@ -412,7 +430,7 @@ else
 fi
 
 # -----------------------------------------------
-# 10. Resumen final
+# 11. Resumen final
 # -----------------------------------------------
 echo ""
 echo -e "${GREEN}${BOLD}══════════════════════════════════════${NC}"
