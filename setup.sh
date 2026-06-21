@@ -47,17 +47,18 @@ fi
 
 # -----------------------------------------------
 # 2. Actualizar repositorios
+# -----------------------------------------------
 info "Actualizando repositorios..."
-pkg update -y && pkg upgrade -y
+pkg update -y &>/dev/null && pkg upgrade -y &>/dev/null
 ok "Repositorios actualizados"
 
 # -----------------------------------------------
-# 2. Instalar paquetes esenciales
+# 3. Instalar paquetes esenciales
 # -----------------------------------------------
 info "Instalando paquetes esenciales..."
 PKGS=(
     zsh git curl wget nano bat eza fd fzf zoxide
-    python python-pip nodejs-lts proot-distro
+    python python-pip nodejs-lts
     termux-api openssh man
 )
 
@@ -66,13 +67,13 @@ for pkg in "${PKGS[@]}"; do
         warn "$pkg ya instalado, omitiendo..."
     else
         info "Instalando $pkg..."
-        pkg install -y "$pkg" || warn "No se pudo instalar $pkg, continuando..."
+        pkg install -y "$pkg" &>/dev/null || warn "No se pudo instalar $pkg, continuando..."
+        ok "$pkg instalado"
     fi
 done
-ok "Paquetes instalados"
 
 # -----------------------------------------------
-# 3. Instalar Oh My Zsh
+# 4. Instalar Oh My Zsh
 # -----------------------------------------------
 if [ -d "$HOME/.oh-my-zsh" ]; then
     warn "Oh My Zsh ya existe, omitiendo instalación..."
@@ -80,28 +81,28 @@ else
     info "Instalando Oh My Zsh..."
     RUNZSH=no CHSH=no sh -c \
         "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" \
-        || fail "Error instalando Oh My Zsh"
+        &>/dev/null || fail "Error instalando Oh My Zsh"
     ok "Oh My Zsh instalado"
 fi
 
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
 # -----------------------------------------------
-# 4. Instalar Powerlevel10k
+# 5. Instalar Powerlevel10k
 # -----------------------------------------------
 P10K_DIR="$ZSH_CUSTOM/themes/powerlevel10k"
 if [ -d "$P10K_DIR" ]; then
     warn "Powerlevel10k ya existe, actualizando..."
-    git -C "$P10K_DIR" pull --quiet
+    git -C "$P10K_DIR" pull --quiet &>/dev/null
 else
     info "Instalando Powerlevel10k..."
     git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$P10K_DIR" \
-        || fail "Error clonando Powerlevel10k"
+        &>/dev/null || fail "Error clonando Powerlevel10k"
     ok "Powerlevel10k instalado"
 fi
 
 # -----------------------------------------------
-# 5. Instalar plugins de zsh
+# 6. Instalar plugins de zsh
 # -----------------------------------------------
 install_plugin() {
     local name="$1"
@@ -109,11 +110,11 @@ install_plugin() {
     local dir="$ZSH_CUSTOM/plugins/$name"
     if [ -d "$dir" ]; then
         warn "Plugin $name ya existe, actualizando..."
-        git -C "$dir" pull --quiet
+        git -C "$dir" pull --quiet &>/dev/null
     else
         info "Instalando plugin: $name..."
         git clone --depth=1 "$repo" "$dir" \
-            || warn "No se pudo instalar $name"
+            &>/dev/null || warn "No se pudo instalar $name"
         ok "Plugin $name instalado"
     fi
 }
@@ -437,6 +438,12 @@ fi
 # -----------------------------------------------
 # 11. Resumen final
 # -----------------------------------------------
+clear
+echo -e "${CYAN}${BOLD}"
+echo -e "  ╔══════════════════════════════════╗"
+echo -e "  ║       🖤  Shadow-SetUp  🖤       ║"
+echo -e "  ╚══════════════════════════════════╝"
+echo -e "${NC}"
 echo ""
 echo -e "${GREEN}${BOLD}══════════════════════════════════════${NC}"
 echo -e "${GREEN}${BOLD}  ✓ Setup completado exitosamente!${NC}"
