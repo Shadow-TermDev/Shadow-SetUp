@@ -89,19 +89,26 @@ info "Setting up CLI..."
 
 # Make CLI executable
 chmod +x "$SHADOW_DIR/shadow/cli.py"
+chmod +x "$SHADOW_DIR/sw"
 
 # Create symlink for easy access
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
+
+# Create wrapper scripts
+cat > "$BIN_DIR/sw" << EOF
+#!/data/data/com.termux/files/usr/bin/bash
+exec python3 "$SHADOW_DIR/shadow/cli.py" "\$@"
+EOF
 
 cat > "$BIN_DIR/shadow" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 exec python3 "$SHADOW_DIR/shadow/cli.py" "\$@"
 EOF
 
-chmod +x "$BIN_DIR/shadow"
+chmod +x "$BIN_DIR/sw" "$BIN_DIR/shadow"
 
-ok "CLI installed: 'shadow' command available"
+ok "CLI installed: 'sw' and 'shadow' commands available"
 
 # -----------------------------------------------
 # Run initial setup

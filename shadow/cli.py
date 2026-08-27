@@ -189,6 +189,9 @@ def main():
     """Main entry point."""
     ensure_dirs()
     
+    # Clear screen for clean CLI experience
+    console.clear()
+    
     args = sys.argv[1:]
     
     if not args:

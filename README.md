@@ -19,20 +19,22 @@ curl -fsSL https://raw.githubusercontent.com/Shadow-TermDev/Shadow-SetUp/main/in
 Then run:
 
 ```bash
-shadow help
+sw help
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `shadow install <module>` | Install a module |
-| `shadow update [module]` | Update module(s) |
-| `shadow uninstall <module>` | Uninstall a module |
-| `shadow list` | List available modules |
-| `shadow status [module]` | Show module status |
-| `shadow update-core` | Update framework from GitHub |
-| `shadow version` | Show version |
+| `sw install <module>` | Install a module |
+| `sw update [module]` | Update module(s) |
+| `sw uninstall <module>` | Uninstall a module |
+| `sw list` | List available modules |
+| `sw status [module]` | Show module status |
+| `sw update-core` | Update framework from GitHub |
+| `sw version` | Show version |
+
+> **Note:** `shadow` is also available as an alias for `sw`.
 
 ## Modules
 
@@ -48,22 +50,22 @@ shadow help
 
 ```bash
 # Install everything
-shadow install shell tools fonts dotfiles aliases
+sw install shell tools fonts dotfiles aliases
 
 # Install just shell
-shadow install shell
+sw install shell
 
 # Update all modules
-shadow update
+sw update
 
 # Update only shell
-shadow update shell
+sw update shell
 
 # Check status
-shadow status
+sw status
 
 # Update framework
-shadow update-core
+sw update-core
 ```
 
 ## Project Structure
@@ -71,6 +73,7 @@ shadow update-core
 ```
 Shadow-SetUp/
 ├── install.sh              ← curl-installable installer
+├── sw                      ← CLI wrapper (short alias)
 ├── shadow/
 │   ├── __init__.py
 │   ├── cli.py              ← CLI entry point
