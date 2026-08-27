@@ -7,15 +7,17 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-# Paths
-SHADOW_HOME = Path.home() / "Shadow-SetUp"
-SHADOW_CACHE = Path.home() / ".cache" / "shadow-setup"
-SHADOW_BACKUP = Path.home() / ".shadow-backup"
+# Paths — configs go to ~/.shadow-setup/
+SHADOW_DATA = Path.home() / ".shadow-setup"
+SHADOW_CACHE = SHADOW_DATA / "cache"
+SHADOW_BACKUP = SHADOW_DATA / "backups"
+SHADOW_BIN = Path.home() / ".local" / "bin"
 TERMUX_HOME = Path.home() / ".termux"
 OH_MY_ZSH = Path.home() / ".oh-my-zsh"
 
 def ensure_dirs():
     """Create required directories."""
+    SHADOW_DATA.mkdir(parents=True, exist_ok=True)
     SHADOW_CACHE.mkdir(parents=True, exist_ok=True)
     SHADOW_BACKUP.mkdir(parents=True, exist_ok=True)
 
@@ -45,9 +47,8 @@ def get_terminal_size() -> tuple[int, int]:
 def backup_file(filepath: Path) -> Optional[Path]:
     """Backup a file before overwriting."""
     if filepath.exists():
-        backup_dir = SHADOW_BACKUP / "latest"
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        backup_path = backup_dir / filepath.name
+        SHADOW_BACKUP.mkdir(parents=True, exist_ok=True)
+        backup_path = SHADOW_BACKUP / filepath.name
         shutil.copy2(filepath, backup_path)
         return backup_path
     return None

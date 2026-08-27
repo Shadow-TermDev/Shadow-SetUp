@@ -12,8 +12,8 @@ class BaseModule(ABC):
     
     def __init__(self):
         self.home = Path.home()
-        self.shadow_home = self.home / "Shadow-SetUp"
-        self.cache_dir = self.home / ".cache" / "shadow-setup"
+        self.shadow_data = self.home / ".shadow-setup"
+        self.cache_dir = self.shadow_data / "cache"
         
     @abstractmethod
     def install(self) -> bool:

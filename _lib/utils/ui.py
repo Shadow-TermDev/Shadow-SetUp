@@ -12,8 +12,6 @@ from rich.columns import Columns
 from rich.align import Align
 from rich import box
 from rich.theme import Theme
-from rich.layout import Layout
-from rich.live import Live
 
 # Custom theme
 SHADOW_THEME = Theme({
@@ -28,7 +26,7 @@ SHADOW_THEME = Theme({
 console = Console(theme=SHADOW_THEME)
 
 def get_terminal_size() -> tuple[int, int]:
-    """Get terminal columns and rows, handling zoom and resize."""
+    """Get terminal columns and rows."""
     try:
         size = shutil.get_terminal_size()
         return size.columns, size.lines
@@ -57,19 +55,14 @@ def banner():
     
     try:
         if zoom == "large":
-            # Full banner for large terminals
             ascii_art = pyfiglet.figlet_format("Shadow-SetUp", font="slant")
         elif zoom == "medium":
-            # Medium banner
             ascii_art = pyfiglet.figlet_format("Shadow", font="standard")
         else:
-            # Minimal banner for small terminals
             ascii_art = pyfiglet.figlet_format("SS", font="small")
     except Exception:
-        # Fallback if pyfiglet fails
         ascii_art = "Shadow-SetUp"
     
-    # Center and color the banner
     for line in ascii_art.rstrip().split("\n"):
         console.print(Align.center(f"[bold cyan]{line}[/bold cyan]"))
     
@@ -203,8 +196,3 @@ def status_table(status_data: dict):
 def clear_screen():
     """Clear terminal screen."""
     console.clear()
-
-def spinner(message: str):
-    """Show a spinner with message."""
-    with console.status(f"[bold cyan]{message}[/bold cyan]") as status:
-        return status

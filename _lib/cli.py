@@ -3,7 +3,7 @@
 Shadow-SetUp CLI — Modular Termux Environment Manager.
 
 Usage:
-    shadow <command> [module...]
+    sw <command> [module...]
     
 Commands:
     install <module>   Install a module
@@ -20,22 +20,24 @@ import sys
 import os
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add parent directory to path for both installed and dev modes
+lib_dir = Path(__file__).parent
+sys.path.insert(0, str(lib_dir.parent))
+sys.path.insert(0, str(lib_dir))
 
-from shadow import __version__
-from shadow.utils.ui import (
+from _lib import __version__
+from _lib.utils.ui import (
     console, banner, success_box, error_box, 
     info_box, module_table, status_table
 )
-from shadow.utils import SHADOW_HOME, ensure_dirs
+from _lib.utils import SHADOW_DATA, ensure_dirs
 
 # Import modules
-from shadow.modules.shell import ShellModule
-from shadow.modules.tools import ToolsModule
-from shadow.modules.fonts import FontsModule
-from shadow.modules.dotfiles import DotfilesModule
-from shadow.modules.aliases import AliasesModule
+from _lib.modules.shell import ShellModule
+from _lib.modules.tools import ToolsModule
+from _lib.modules.fonts import FontsModule
+from _lib.modules.dotfiles import DotfilesModule
+from _lib.modules.aliases import AliasesModule
 
 MODULES = {
     "shell": ShellModule(),
@@ -48,7 +50,7 @@ MODULES = {
 def show_help():
     """Display help information."""
     banner()
-    console.print("[bold]Usage:[/bold] shadow <command> [module]")
+    console.print("[bold]Usage:[/bold] sw <command> [module]")
     console.print()
     console.print("[bold]Commands:[/bold]")
     console.print("  install <module>   Install a module")
@@ -65,10 +67,10 @@ def show_help():
         console.print(f"  [cyan]•[/cyan] {name} — {mod.description}")
     console.print()
     console.print("[bold]Examples:[/bold]")
-    console.print("  shadow install shell    # Install zsh + plugins")
-    console.print("  shadow update           # Update all modules")
-    console.print("  shadow update shell     # Update only shell")
-    console.print("  shadow status           # Show all status")
+    console.print("  sw install shell    # Install zsh + plugins")
+    console.print("  sw update           # Update all modules")
+    console.print("  sw update shell     # Update only shell")
+    console.print("  sw status           # Show all status")
 
 def list_modules():
     """List all available modules."""
@@ -141,15 +143,12 @@ def update_core():
     banner()
     info_box("Updating Shadow-SetUp", "Cloning latest version from GitHub...")
     
-    cache_dir = Path.home() / ".cache" / "shadow-setup"
-    temp_dir = cache_dir / "shadow-update"
+    temp_dir = SHADOW_DATA / "cache" / "shadow-update"
     
     try:
-        # Clean temp dir
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
         
-        # Clone repo
         result = subprocess.run([
             "git", "clone", "--depth=1",
             "https://github.com/Shadow-TermDev/Shadow-SetUp.git",
@@ -160,22 +159,32 @@ def update_core():
             error_box("Update failed", "Could not clone repository")
             return
         
-        # Copy files
-        shadow_pkg = temp_dir / "shadow"
-        if shadow_pkg.exists():
-            shutil.rmtree(SHADOW_HOME / "shadow")
-            shutil.copytree(shadow_pkg, SHADOW_HOME / "shadow")
-        
-        # Copy other files
-        for f in ["setup.sh", "README.md"]:
-            src = temp_dir / f
-            if src.exists():
-                shutil.copy2(src, SHADOW_HOME / f)
+        # Copy _lib (CLI code)
+        lib_src = temp_dir / "_lib"
+        lib_dst = SHADOW_DATA / "_lib"
+        if lib_src.exists():
+            if lib_dst.exists():
+                shutil.rmtree(lib_dst)
+            shutil.copytree(lib_src, lib_dst)
         
         # Copy dotfiles
         dotfiles_src = temp_dir / "dotfiles"
+        dotfiles_dst = SHADOW_DATA / "dotfiles"
         if dotfiles_src.exists():
-            shutil.copytree(dotfiles_src, SHADOW_HOME / "dotfiles", dirs_exist_ok=True)
+            if dotfiles_dst.exists():
+                shutil.rmtree(dotfiles_dst)
+            shutil.copytree(dotfiles_src, dotfiles_dst)
+        
+        # Update wrapper scripts
+        bin_dir = Path.home() / ".local" / "bin"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        
+        for cmd_name in ["sw", "shadow"]:
+            wrapper = bin_dir / cmd_name
+            wrapper.write_text(f"""#!/data/data/com.termux/files/usr/bin/bash
+exec python3 "{SHADOW_DATA}/_lib/cli.py" "$@"
+""")
+            wrapper.chmod(0o755)
         
         # Clean up
         shutil.rmtree(temp_dir)
@@ -189,7 +198,6 @@ def main():
     """Main entry point."""
     ensure_dirs()
     
-    # Clear screen for clean CLI experience
     console.clear()
     
     args = sys.argv[1:]

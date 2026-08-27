@@ -2,9 +2,9 @@
 
 import subprocess
 from pathlib import Path
-from shadow.modules import BaseModule
-from shadow.utils import run_cmd, cmd_exists, backup_file, OH_MY_ZSH
-from shadow.utils.ui import console, success_box, error_box, info_box, progress_bar
+from _lib.modules import BaseModule
+from _lib.utils import run_cmd, cmd_exists, backup_file, OH_MY_ZSH
+from _lib.utils.ui import console, success_box, error_box, info_box
 
 class ShellModule(BaseModule):
     name = "shell"
@@ -19,7 +19,6 @@ class ShellModule(BaseModule):
         try:
             info_box("Installing shell module", "Setting up zsh environment")
             
-            # Install zsh
             if not cmd_exists("zsh"):
                 console.print("  [info]Installing zsh...[/info]")
                 run_cmd(["pkg", "install", "-y", "zsh"], check=True)
@@ -27,7 +26,6 @@ class ShellModule(BaseModule):
             else:
                 console.print("  [warning]zsh already installed, skipping...[/warning]")
             
-            # Install Oh My Zsh
             if not OH_MY_ZSH.exists():
                 console.print("  [info]Installing Oh My Zsh...[/info]")
                 run_cmd([
@@ -39,7 +37,6 @@ class ShellModule(BaseModule):
                 console.print("  [warning]Oh My Zsh already installed, updating...[/warning]")
                 run_cmd(["git", "-C", str(OH_MY_ZSH), "pull"], check=True)
             
-            # Install Powerlevel10k
             p10k_dir = OH_MY_ZSH / "custom" / "themes" / "powerlevel10k"
             if not p10k_dir.exists():
                 console.print("  [info]Installing Powerlevel10k...[/info]")
@@ -53,7 +50,6 @@ class ShellModule(BaseModule):
                 console.print("  [warning]Powerlevel10k already installed, updating...[/warning]")
                 run_cmd(["git", "-C", str(p10k_dir), "pull"], check=True)
             
-            # Install plugins
             plugins_dir = OH_MY_ZSH / "custom" / "plugins"
             plugins_dir.mkdir(parents=True, exist_ok=True)
             
@@ -69,7 +65,6 @@ class ShellModule(BaseModule):
                     console.print(f"  [warning]Plugin {name} already installed, updating...[/warning]")
                     run_cmd(["git", "-C", str(plugin_dir), "pull"], check=True)
             
-            # Change shell to zsh
             current_shell = run_cmd(["sh", "-c", "echo $SHELL"], capture=True).stdout.strip()
             zsh_path = run_cmd(["which", "zsh"], capture=True).stdout.strip()
             if current_shell != zsh_path:

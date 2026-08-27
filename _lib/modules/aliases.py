@@ -2,15 +2,14 @@
 
 import shutil
 from pathlib import Path
-from shadow.modules import BaseModule
-from shadow.utils import backup_file
-from shadow.utils.ui import console, success_box, error_box, info_box
+from _lib.modules import BaseModule
+from _lib.utils.ui import console, success_box, error_box, info_box
 
 class AliasesModule(BaseModule):
     name = "aliases"
     description = "Shell aliases and functions"
     
-    ALIASES_FILE = Path.home() / "Shadow-SetUp" / "dotfiles" / "aliases.sh"
+    ALIASES_FILE = Path(__file__).parent.parent.parent / "dotfiles" / "aliases.sh"
     ZSHRC = Path.home() / ".zshrc"
     
     def install(self) -> bool:
@@ -21,17 +20,14 @@ class AliasesModule(BaseModule):
                 error_box("Aliases", "aliases.sh not found in repo")
                 return False
             
-            # Check if already in .zshrc
             if self.ZSHRC.exists():
                 content = self.ZSHRC.read_text()
                 if "source.*aliases.sh" in content or "shadow-aliases" in content:
                     console.print("  [warning]Aliases already in .zshrc, updating...[/warning]")
-                    # Remove old entries
                     lines = [l for l in content.splitlines() 
                             if "shadow-aliases" not in l and "source.*aliases.sh" not in l]
                     self.ZSHRC.write_text("\n".join(lines))
             
-            # Add source line to .zshrc
             source_line = f"\n# Shadow-SetUp Aliases\nsource {self.ALIASES_FILE}\n"
             
             with open(self.ZSHRC, "a") as f:

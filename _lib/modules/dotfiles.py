@@ -2,15 +2,15 @@
 
 import shutil
 from pathlib import Path
-from shadow.modules import BaseModule
-from shadow.utils import backup_file
-from shadow.utils.ui import console, success_box, error_box, info_box
+from _lib.modules import BaseModule
+from _lib.utils import backup_file, TERMUX_HOME
+from _lib.utils.ui import console, success_box, error_box, info_box
 
 class DotfilesModule(BaseModule):
     name = "dotfiles"
     description = "Configuration files (.zshrc, .p10k.zsh, .nanorc, .termux)"
     
-    DOTFILES_DIR = Path.home() / "Shadow-SetUp" / "dotfiles"
+    DOTFILES_DIR = Path(__file__).parent.parent.parent / "dotfiles"
     
     FILES = [
         ".zshrc",
@@ -28,7 +28,6 @@ class DotfilesModule(BaseModule):
         try:
             info_box("Installing dotfiles", "Copying configuration files")
             
-            # Copy main dotfiles
             for filename in self.FILES:
                 src = self.DOTFILES_DIR / filename
                 dst = Path.home() / filename
@@ -41,9 +40,8 @@ class DotfilesModule(BaseModule):
                 else:
                     console.print(f"  [warning]{filename} not found in repo[/warning]")
             
-            # Copy .termux files
             termux_src = self.DOTFILES_DIR / ".termux"
-            termux_dst = Path.home() / ".termux"
+            termux_dst = TERMUX_HOME
             termux_dst.mkdir(parents=True, exist_ok=True)
             
             for filename in self.TERMUX_FILES:
@@ -58,10 +56,9 @@ class DotfilesModule(BaseModule):
                 else:
                     console.print(f"  [warning].termux/{filename} not found[/warning]")
             
-            # Reload Termux settings
             result = console.input("\n  [bold]Reload Termux settings? [Y/n]: [/bold]").strip()
             if result.lower() != "n":
-                from shadow.utils import run_cmd
+                from _lib.utils import run_cmd
                 run_cmd(["termux-reload-settings"])
                 console.print("  [info]Settings reloaded[/info]")
             

@@ -3,17 +3,16 @@
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
-# Add parent to path
+# Add _lib to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from shadow.modules.shell import ShellModule
-from shadow.modules.tools import ToolsModule
-from shadow.modules.fonts import FontsModule
-from shadow.modules.dotfiles import DotfilesModule
-from shadow.modules.aliases import AliasesModule
-from shadow.utils import SHADOW_HOME
+from _lib.modules.shell import ShellModule
+from _lib.modules.tools import ToolsModule
+from _lib.modules.fonts import FontsModule
+from _lib.modules.dotfiles import DotfilesModule
+from _lib.modules.aliases import AliasesModule
+from _lib.utils import SHADOW_DATA
 
 MODULES = {
     "shell": ShellModule(),
@@ -23,23 +22,14 @@ MODULES = {
     "aliases": AliasesModule(),
 }
 
-# MCP Protocol handlers
 def handle_initialize(params: dict) -> dict:
-    """Handle MCP initialize request."""
     return {
         "protocolVersion": "2024-11-05",
-        "capabilities": {
-            "tools": {},
-            "resources": {}
-        },
-        "serverInfo": {
-            "name": "shadow-setup",
-            "version": "2.0.0"
-        }
+        "capabilities": {"tools": {}, "resources": {}},
+        "serverInfo": {"name": "shadow-setup", "version": "2.1.0"}
     }
 
 def handle_tools_list(params: dict) -> dict:
-    """List available tools."""
     return {
         "tools": [
             {
@@ -85,10 +75,7 @@ def handle_tools_list(params: dict) -> dict:
             {
                 "name": "shadow_list_modules",
                 "description": "List all available Shadow-SetUp modules",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
+                "inputSchema": {"type": "object", "properties": {}}
             },
             {
                 "name": "shadow_get_config",
@@ -98,7 +85,7 @@ def handle_tools_list(params: dict) -> dict:
                     "properties": {
                         "key": {
                             "type": "string",
-                            "description": "Configuration key (home, cache, backup)"
+                            "description": "Configuration key (data, cache, backup)"
                         }
                     }
                 }
@@ -107,7 +94,6 @@ def handle_tools_list(params: dict) -> dict:
     }
 
 def handle_tools_call(params: dict) -> dict:
-    """Handle tool calls."""
     tool_name = params.get("name", "")
     arguments = params.get("arguments", {})
     
@@ -122,15 +108,14 @@ def handle_tools_call(params: dict) -> dict:
         elif tool_name == "shadow_update":
             module_name = arguments.get("module")
             if module_name == "core":
-                # Update core from GitHub
-                from shadow.utils.ui import update_core
+                from _lib.utils.ui import console
+                from _lib.cli import update_core
                 update_core()
                 return {"success": True, "message": "Core updated"}
             elif module_name in MODULES:
                 result = MODULES[module_name].update()
                 return {"success": result, "module": module_name}
             elif module_name is None:
-                # Update all
                 results = {}
                 for name, mod in MODULES.items():
                     results[name] = mod.update()
@@ -158,9 +143,9 @@ def handle_tools_call(params: dict) -> dict:
         elif tool_name == "shadow_get_config":
             key = arguments.get("key")
             config = {
-                "home": str(SHADOW_HOME),
-                "cache": str(SHADOW_HOME.parent / ".cache" / "shadow-setup"),
-                "backup": str(SHADOW_HOME.parent / ".shadow-backup"),
+                "data": str(SHADOW_DATA),
+                "cache": str(SHADOW_DATA / "cache"),
+                "backup": str(SHADOW_DATA / "backups"),
             }
             if key:
                 return {key: config.get(key)}
@@ -173,8 +158,6 @@ def handle_tools_call(params: dict) -> dict:
         return {"error": str(e)}
 
 def main():
-    """Main MCP server loop."""
-    # Simple JSON-RPC over stdin/stdout
     for line in sys.stdin:
         try:
             request = json.loads(line.strip())
@@ -191,23 +174,14 @@ def main():
             else:
                 response = {"error": f"Unknown method: {method}"}
             
-            # Send response
-            result = {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": response
-            }
+            result = {"jsonrpc": "2.0", "id": req_id, "result": response}
             print(json.dumps(result))
             sys.stdout.flush()
             
         except json.JSONDecodeError:
             continue
         except Exception as e:
-            error_response = {
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {"code": -1, "message": str(e)}
-            }
+            error_response = {"jsonrpc": "2.0", "id": None, "error": {"code": -1, "message": str(e)}}
             print(json.dumps(error_response))
             sys.stdout.flush()
 

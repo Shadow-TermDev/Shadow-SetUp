@@ -1,8 +1,8 @@
 """Tools module — Essential packages for Termux."""
 
-from shadow.modules import BaseModule
-from shadow.utils import run_cmd, pkg_installed
-from shadow.utils.ui import console, success_box, error_box, info_box
+from _lib.modules import BaseModule
+from _lib.utils import run_cmd, pkg_installed
+from _lib.utils.ui import console, success_box, error_box, info_box
 
 class ToolsModule(BaseModule):
     name = "tools"

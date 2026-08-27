@@ -12,6 +12,7 @@ GREEN='\033[0;92m'
 YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m'
 
 ok()   { echo -e "${GREEN}[✓]${NC} $1"; }
@@ -20,7 +21,7 @@ warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 fail() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
 # -----------------------------------------------
-# Banner (using pyfiglet once installed)
+# Banner
 # -----------------------------------------------
 clear
 echo -e "${CYAN}${BOLD}"
@@ -30,6 +31,12 @@ echo "  ╚═══════════════════════
 echo -e "${NC}"
 echo -e "  ${BOLD}Modular Termux Environment Manager${NC}"
 echo ""
+
+# -----------------------------------------------
+# Paths
+# -----------------------------------------------
+SHADOW_DATA="$HOME/.shadow-setup"
+SHADOW_BIN="$HOME/.local/bin"
 
 # -----------------------------------------------
 # Check dependencies
@@ -66,49 +73,69 @@ pip install --user rich colorama pyfiglet &>/dev/null || {
 ok "Python packages installed"
 
 # -----------------------------------------------
-# Clone repository
+# Create directories
 # -----------------------------------------------
-SHADOW_DIR="$HOME/Shadow-SetUp"
+info "Setting up directories..."
 
-if [ -d "$SHADOW_DIR" ]; then
-    warn "Shadow-SetUp already exists. Updating..."
-    cd "$SHADOW_DIR"
-    git pull --quiet &>/dev/null || warn "Git pull failed"
-else
-    info "Cloning Shadow-SetUp..."
-    git clone --depth=1 https://github.com/Shadow-TermDev/Shadow-SetUp.git "$SHADOW_DIR" &>/dev/null \
-        || fail "Failed to clone repository"
+mkdir -p "$SHADOW_DATA"
+mkdir -p "$SHADOW_DATA/cache"
+mkdir -p "$SHADOW_DATA/backups"
+mkdir -p "$SHADOW_BIN"
+
+ok "Directories ready"
+
+# -----------------------------------------------
+# Clone/update repo
+# -----------------------------------------------
+TEMP_DIR="$SHADOW_DATA/cache/shadow-install"
+
+if [ -d "$TEMP_DIR" ]; then
+    rm -rf "$TEMP_DIR"
 fi
 
-ok "Repository ready"
+info "Downloading Shadow-SetUp..."
+git clone --depth=1 https://github.com/Shadow-TermDev/Shadow-SetUp.git "$TEMP_DIR" &>/dev/null \
+    || fail "Failed to download repository"
+
+ok "Repository downloaded"
 
 # -----------------------------------------------
-# Create CLI symlink
+# Install files to ~/.shadow-setup/
 # -----------------------------------------------
-info "Setting up CLI..."
+info "Installing files..."
 
-# Make CLI executable
-chmod +x "$SHADOW_DIR/shadow/cli.py"
-chmod +x "$SHADOW_DIR/sw"
+# Copy _lib (CLI code)
+if [ -d "$TEMP_DIR/_lib" ]; then
+    rm -rf "$SHADOW_DATA/_lib"
+    cp -r "$TEMP_DIR/_lib" "$SHADOW_DATA/_lib"
+    ok "_lib installed"
+fi
 
-# Create symlink for easy access
-BIN_DIR="$HOME/.local/bin"
-mkdir -p "$BIN_DIR"
+# Copy dotfiles
+if [ -d "$TEMP_DIR/dotfiles" ]; then
+    rm -rf "$SHADOW_DATA/dotfiles"
+    cp -r "$TEMP_DIR/dotfiles" "$SHADOW_DATA/dotfiles"
+    ok "dotfiles installed"
+fi
 
-# Create wrapper scripts
-cat > "$BIN_DIR/sw" << EOF
+# -----------------------------------------------
+# Create CLI wrappers
+# -----------------------------------------------
+info "Creating CLI commands..."
+
+for cmd in sw shadow; do
+    cat > "$SHADOW_BIN/$cmd" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
-exec python3 "$SHADOW_DIR/shadow/cli.py" "\$@"
+exec python3 "$SHADOW_DATA/_lib/cli.py" "\$@"
 EOF
+    chmod +x "$SHADOW_BIN/$cmd"
+    ok "Command '$cmd' created"
+done
 
-cat > "$BIN_DIR/shadow" << EOF
-#!/data/data/com.termux/files/usr/bin/bash
-exec python3 "$SHADOW_DIR/shadow/cli.py" "\$@"
-EOF
-
-chmod +x "$BIN_DIR/sw" "$BIN_DIR/shadow"
-
-ok "CLI installed: 'sw' and 'shadow' commands available"
+# -----------------------------------------------
+# Clean up
+# -----------------------------------------------
+rm -rf "$TEMP_DIR"
 
 # -----------------------------------------------
 # Run initial setup
@@ -128,23 +155,23 @@ choice="${choice:-1}"
 
 case "$choice" in
     1)
-        python3 "$SHADOW_DIR/shadow/cli.py" install shell tools fonts dotfiles aliases
+        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools fonts dotfiles aliases
         ;;
     2)
-        python3 "$SHADOW_DIR/shadow/cli.py" install shell tools
+        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools
         ;;
     3)
         echo ""
         echo "Available modules: shell, tools, fonts, dotfiles, aliases"
         read -p "  Modules (space-separated): " modules
-        python3 "$SHADOW_DIR/shadow/cli.py" install $modules
+        python3 "$SHADOW_DATA/_lib/cli.py" install $modules
         ;;
     4)
-        info "Skipping setup. Run 'shadow install <module>' later."
+        info "Skipping setup. Run 'sw install <module>' later."
         ;;
     *)
         warn "Invalid choice, running full setup..."
-        python3 "$SHADOW_DIR/shadow/cli.py" install shell tools fonts dotfiles aliases
+        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools fonts dotfiles aliases
         ;;
 esac
 
@@ -154,8 +181,8 @@ esac
 echo ""
 echo -e "${GREEN}${BOLD}✓ Installation complete!${NC}"
 echo ""
-echo -e "  Run: ${BOLD}shadow help${NC}"
-echo -e "  Or:  ${BOLD}shadow install shell tools${NC}"
+echo -e "  Run: ${BOLD}sw help${NC}"
+echo -e "  Or:  ${BOLD}sw install shell tools${NC}"
 echo ""
-echo -e "  ${DIM}Tip: Add 'source ~/.zshrc' to your shell config${NC}"
+echo -e "  ${DIM}Tip: Add '$SHADOW_BIN' to your PATH if needed${NC}"
 echo ""
