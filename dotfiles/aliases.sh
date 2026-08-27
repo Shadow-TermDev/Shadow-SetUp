@@ -106,9 +106,10 @@ alias proot-start='proot-distro login ubuntu'
 # -----------------------------------------------
 # Aliases: Shadow-SetUp
 # -----------------------------------------------
-alias shadow='bash ~/Shadow-SetUp/shadow'
-alias ss-update='shadow update-core'
-alias ss-status='shadow status'
+alias sw='~/.local/bin/sw'
+alias shadow='~/.local/bin/sw'
+alias ss-update='sw update-core'
+alias ss-status='sw status'
 
 # -----------------------------------------------
 # Funciones

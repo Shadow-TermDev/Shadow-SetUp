@@ -133,6 +133,23 @@ EOF
 done
 
 # -----------------------------------------------
+# Ensure ~/.local/bin is in PATH
+# -----------------------------------------------
+info "Setting up PATH..."
+
+SHELL_RC="$HOME/.zshrc"
+[ ! -f "$SHELL_RC" ] && SHELL_RC="$HOME/.bashrc"
+
+if ! grep -q '\.local/bin' "$SHELL_RC" 2>/dev/null; then
+    echo '' >> "$SHELL_RC"
+    echo '# Shadow-SetUp PATH' >> "$SHELL_RC"
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_RC"
+    ok "PATH added to $(basename $SHELL_RC)"
+else
+    warn "~/.local/bin already in PATH"
+fi
+
+# -----------------------------------------------
 # Clean up
 # -----------------------------------------------
 rm -rf "$TEMP_DIR"
