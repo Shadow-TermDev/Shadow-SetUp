@@ -136,69 +136,70 @@ def show_status(module_names: list[str] = None):
         status_table(status_data)
 
 def update_core():
-    """Update Shadow-SetUp from GitHub."""
+    """Update Shadow-SetUp from GitHub with clean progress."""
     import subprocess
     import shutil
     
     banner()
-    info_box("Updating Shadow-SetUp", "Cloning latest version from GitHub...")
     
     temp_dir = SHADOW_DATA / "cache" / "shadow-update"
     
-    try:
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
-        
-        result = subprocess.run([
-            "git", "clone", "--depth=1",
-            "https://github.com/Shadow-TermDev/Shadow-SetUp.git",
-            str(temp_dir)
-        ], capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            error_box("Update failed", "Could not clone repository")
-            return
-        
-        # Copy _lib (CLI code)
-        lib_src = temp_dir / "_lib"
-        lib_dst = SHADOW_DATA / "_lib"
-        if lib_src.exists():
-            if lib_dst.exists():
-                shutil.rmtree(lib_dst)
-            shutil.copytree(lib_src, lib_dst)
-        
-        # Copy dotfiles
-        dotfiles_src = temp_dir / "dotfiles"
-        dotfiles_dst = SHADOW_DATA / "dotfiles"
-        if dotfiles_src.exists():
-            if dotfiles_dst.exists():
-                shutil.rmtree(dotfiles_dst)
-            shutil.copytree(dotfiles_src, dotfiles_dst)
-        
-        # Update wrapper scripts
-        bin_dir = Path.home() / ".local" / "bin"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        
-        for cmd_name in ["sw", "shadow"]:
-            wrapper = bin_dir / cmd_name
-            wrapper.write_text(f"""#!/data/data/com.termux/files/usr/bin/bash
+    with console.status("[bold cyan]Downloading update...[/bold cyan]", spinner="dots") as status:
+        try:
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
+            
+            result = subprocess.run([
+                "git", "clone", "--depth=1",
+                "https://github.com/Shadow-TermDev/Shadow-SetUp.git",
+                str(temp_dir)
+            ], capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                error_box("Update failed", "Could not download update")
+                return
+            
+            status.update("[bold cyan]Installing files...[/bold cyan]")
+            
+            # Copy _lib (CLI code)
+            lib_src = temp_dir / "_lib"
+            lib_dst = SHADOW_DATA / "_lib"
+            if lib_src.exists():
+                if lib_dst.exists():
+                    shutil.rmtree(lib_dst)
+                shutil.copytree(lib_src, lib_dst)
+            
+            # Copy dotfiles
+            dotfiles_src = temp_dir / "dotfiles"
+            dotfiles_dst = SHADOW_DATA / "dotfiles"
+            if dotfiles_src.exists():
+                if dotfiles_dst.exists():
+                    shutil.rmtree(dotfiles_dst)
+                shutil.copytree(dotfiles_src, dotfiles_dst)
+            
+            # Update wrapper scripts
+            bin_dir = Path.home() / ".local" / "bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            
+            for cmd_name in ["sw", "shadow"]:
+                wrapper = bin_dir / cmd_name
+                wrapper.write_text(f"""#!/data/data/com.termux/files/usr/bin/bash
 exec python3 "{SHADOW_DATA}/_lib/cli.py" "$@"
 """)
-            wrapper.chmod(0o755)
-        
-        # Clean up
-        shutil.rmtree(temp_dir)
-        
-        success_box("Update complete!", "Shadow-SetUp has been updated to the latest version")
-        
-    except Exception as e:
-        error_box("Update failed", str(e))
+                wrapper.chmod(0o755)
+            
+            # Clean up
+            shutil.rmtree(temp_dir)
+            
+        except Exception as e:
+            error_box("Update failed", str(e))
+            return
+    
+    success_box("Update complete!", "Shadow-SetUp is now up to date")
 
 def main():
     """Main entry point."""
     ensure_dirs()
-    
-    console.clear()
     
     args = sys.argv[1:]
     
@@ -208,6 +209,12 @@ def main():
     
     command = args[0]
     module_args = args[1:] if len(args) > 1 else []
+    
+    # Commands that need full UI
+    NEEDS_BANNER = {"list", "install", "update", "uninstall", "status", "update-core"}
+    
+    if command in NEEDS_BANNER:
+        console.clear()
     
     if command == "help" or command == "--help" or command == "-h":
         show_help()

@@ -8,7 +8,6 @@ A modular Termux environment manager with a modern Python CLI.
 - **Hidden config** — All files stored in `~/.shadow-setup/`
 - **Modular system** — Install only what you need
 - **Dynamic UI** — Beautiful terminal output with Rich + pyfiglet
-- **MCP server** — AI agent integration
 - **Auto-updates** — Update from GitHub without reinstalling
 
 ## Quick Installation
@@ -85,8 +84,7 @@ sw update-core
 │   ├── utils/
 │   │   ├── __init__.py
 │   │   └── ui.py          ← Rich + pyfiglet UI
-│   └── mcp/
-│       └── server.py      ← MCP server
+│   └── mcp/               ← MCP server (dev only)
 ├── dotfiles/               ← Config files
 │   ├── .zshrc
 │   ├── .p10k.zsh
@@ -95,22 +93,6 @@ sw update-core
 │   └── .termux/
 └── cache/                  ← Temporary files
 ```
-
-## Font Options
-
-When installing the `fonts` module, you can choose:
-- A new Nerd Font (jetbrains, fira, hack, iosevka, meslo)
-- `keep` — Keep your current font unchanged
-
-## MCP Server
-
-Shadow-SetUp includes an MCP (Model Context Protocol) server for AI agent integration.
-
-```bash
-python3 ~/.shadow-setup/_lib/mcp/server.py
-```
-
-See [_lib/mcp/README.md](_lib/mcp/README.md) for details.
 
 ## Requirements
 
