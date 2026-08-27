@@ -177,6 +177,12 @@ def update_core():
                     shutil.rmtree(dotfiles_dst)
                 shutil.copytree(dotfiles_src, dotfiles_dst)
             
+            # Copy .version
+            version_src = temp_dir / ".version"
+            version_dst = SHADOW_DATA / ".version"
+            if version_src.exists():
+                shutil.copy2(version_src, version_dst)
+            
             # Update wrapper scripts
             bin_dir = Path.home() / ".local" / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)

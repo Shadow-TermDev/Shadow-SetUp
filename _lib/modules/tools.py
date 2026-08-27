@@ -49,8 +49,8 @@ class ToolsModule(BaseModule):
     def update(self) -> bool:
         try:
             info_box("Updating tools", "Running pkg update...")
-            run_cmd(["pkg", "update", "-y"], check=True)
-            run_cmd(["pkg", "upgrade", "-y"], check=True)
+            run_cmd(["pkg", "update", "-y"], capture=True)
+            run_cmd(["pkg", "upgrade", "-y"], capture=True)
             success_box("Tools module", "Update complete!")
             return True
         except Exception as e:
