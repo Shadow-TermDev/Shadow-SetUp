@@ -1,0 +1,26 @@
+# Activa el ratón/táctil para posicionar el cursor haciendo tap
+set mouse
+
+# Muestra números de línea en el lateral
+#set linenumbers
+
+# Ajuste de línea suave para que los textos largos no salgan de pantalla
+set softwrap
+
+# Resaltado de sintaxis (carga reglas por defecto si existen)
+include "/data/data/com.termux/files/usr/share/nano/*.nanorc"
+
+# Autoindentado inteligente según la línea anterior
+set autoindent
+
+# Pestaña de 4 espacios en lugar de tabuladores rígidos
+set tabsize 4
+#set tabstospaces
+
+# Desplaza la pantalla línea por línea en lugar de saltar páginas enteras
+#set smooth
+
+# Ignora mayúsculas/minúsculas en búsquedas por defecto
+#set caseinsensitive
+
+set smarthome
