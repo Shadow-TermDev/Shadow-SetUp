@@ -84,12 +84,17 @@ fi
 
 # -----------------------------------------------
 # Aliases modulares
-#  Se cargan desde dotfiles/aliases.sh
+#  Se cargan desde ~/.shadow-setup/dotfiles/aliases.sh
 # -----------------------------------------------
-SHADOW_ALIASES="$HOME/Shadow-SetUp/dotfiles/aliases.sh"
-if [ -f "$SHADOW_ALIASES" ]; then
-    source "$SHADOW_ALIASES"
-fi
+SHADOW_ALIASES="$HOME/.shadow-setup/dotfiles/aliases.sh"
+[ -f "$SHADOW_ALIASES" ] && source "$SHADOW_ALIASES"
+
+# -----------------------------------------------
+# RICE activo
+#  Se carga desde ~/.shadow-setup/active_rice.sh
+# -----------------------------------------------
+SHADOW_RICE="$HOME/.shadow-setup/active_rice.sh"
+[ -f "$SHADOW_RICE" ] && source "$SHADOW_RICE"
 
 # -----------------------------------------------
 # Hardware/Seguridad

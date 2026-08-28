@@ -15,10 +15,10 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-ok()   { echo -e "${GREEN}[✓]${NC} $1"; }
-info() { echo -e "${CYAN}[→]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
-fail() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
+ok()   { echo -e "${GREEN}[OK]${NC} $1"; }
+info() { echo -e "${CYAN}[>>]${NC} $1"; }
+warn() { echo -e "${YELLOW}[!!]${NC} $1"; }
+fail() { echo -e "${RED}[XX]${NC} $1"; exit 1; }
 
 # -----------------------------------------------
 # Banner
@@ -26,7 +26,7 @@ fail() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 clear
 echo -e "${CYAN}${BOLD}"
 echo "  ╔═══════════════════════════════════════╗"
-echo "  ║         🖤  Shadow-SetUp  🖤          ║"
+echo "  ║       Shadow-SetUp v2.3.0             ║"
 echo "  ╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "  ${BOLD}Modular Termux Environment Manager${NC}"
@@ -66,7 +66,7 @@ ok "Dependencies ready"
 # -----------------------------------------------
 info "Installing Python packages..."
 
-pip install --user rich colorama InquirerPy &>/dev/null || {
+pip install --user rich colorama InquirerPy pyfiglet &>/dev/null || {
     warn "pip install failed, trying with pkg..."
     pkg install -y python-rich python-colorama &>/dev/null || warn "Some packages may not be available"
 }
@@ -117,7 +117,6 @@ if [ -d "$TEMP_DIR/dotfiles" ]; then
     ok "dotfiles installed"
 fi
 
-# Copy .version
 if [ -f "$TEMP_DIR/.version" ]; then
     cp "$TEMP_DIR/.version" "$SHADOW_DATA/.version"
     ok ".version installed"
@@ -160,15 +159,15 @@ fi
 rm -rf "$TEMP_DIR"
 
 # -----------------------------------------------
-# Initial setup
+# Module installation
 # -----------------------------------------------
 echo ""
 echo -e "${BOLD}What would you like to install?${NC}"
 echo ""
-echo "  1) Full setup (all modules)"
-echo "  2) Minimal (shell + tools only)"
-echo "  3) Custom (choose modules)"
-echo "  4) Skip (configure later)"
+echo "  [1] Full setup (all modules)"
+echo "  [2] Minimal (shell + tools only)"
+echo "  [3] Custom (choose modules)"
+echo "  [4] Skip (configure later)"
 echo ""
 read -p "  Choice [1]: " choice
 choice="${choice:-1}"
@@ -196,59 +195,36 @@ case "$choice" in
 esac
 
 # -----------------------------------------------
-# Font selection (first-time only)
+# RICE selection (download on-demand)
 # -----------------------------------------------
 echo ""
-echo -e "${BOLD}Select a Nerd Font for Termux:${NC}"
+echo -e "${BOLD}Select a RICE theme:${NC}"
 echo ""
-echo "  1) JetBrains Mono  (default)"
-echo "  2) Fira Code"
-echo "  3) Hack"
-echo "  4) Iosevka"
-echo "  5) Meslo"
-echo "  6) Keep current font"
+echo "  [1] default    - Clean, minimal theme"
+echo "  [2] kawaii     - Cute theme with TTS"
+echo "  [3] cyberpunk  - Neon futuristic theme"
+echo "  [4] minimal    - No animations, pure speed"
+echo "  [5] hacker     - Matrix-style green"
+echo "  [6] Skip (no RICE)"
 echo ""
-read -p "  Choice [1]: " font_choice
-font_choice="${font_choice:-1}"
+read -p "  Choice [1]: " rice_choice
+rice_choice="${rice_choice:-1}"
 
-FONT_DIR="$HOME/.termux"
-FONT_FILE="$FONT_DIR/font.ttf"
-REPO_URL="https://github.com/ryanoasis/nerd-fonts/releases/latest/download"
-
-declare -A FONTS=(
-    [1]="JetBrainsMono"
-    [2]="FiraCode"
-    [3]="Hack"
-    [4]="Iosevka"
-    [5]="MesloLGS"
-)
-
-if [ "$font_choice" != "6" ] && [ -n "${FONTS[$font_choice]:-}" ]; then
-    font_name="${FONTS[$font_choice]}"
-    info "Downloading $font_name..."
-    mkdir -p "$FONT_DIR"
-    
-    if curl -fsSL "$REPO_URL/${font_name}NerdFont-Regular.ttf" -o "$FONT_FILE"; then
-        ok "$font_name installed"
-        termux-reload-settings 2>/dev/null && ok "Termux settings reloaded"
-    else
-        # Fallback to repo font
-        if [ -f "$SHADOW_DATA/dotfiles/.termux/font.ttf" ]; then
-            cp "$SHADOW_DATA/dotfiles/.termux/font.ttf" "$FONT_FILE"
-            ok "Fallback font installed"
-        fi
-    fi
-elif [ "$font_choice" = "6" ]; then
-    info "Keeping current font"
-else
-    info "Invalid choice, keeping current font"
-fi
+case "$rice_choice" in
+    1) python3 "$SHADOW_DATA/_lib/cli.py" rice set default ;;
+    2) python3 "$SHADOW_DATA/_lib/cli.py" rice set kawaii ;;
+    3) python3 "$SHADOW_DATA/_lib/cli.py" rice set cyberpunk ;;
+    4) python3 "$SHADOW_DATA/_lib/cli.py" rice set minimal ;;
+    5) python3 "$SHADOW_DATA/_lib/cli.py" rice set hacker ;;
+    6) info "No RICE selected" ;;
+    *) warn "Invalid choice, using default..." && python3 "$SHADOW_DATA/_lib/cli.py" rice set default ;;
+esac
 
 # -----------------------------------------------
 # Final
 # -----------------------------------------------
 echo ""
-echo -e "${GREEN}${BOLD}✓ Installation complete!${NC}"
+echo -e "${GREEN}${BOLD}Installation complete!${NC}"
 echo ""
 echo -e "  Run: ${BOLD}sw${NC}           # Interactive menu"
 echo -e "  Or: ${BOLD}sw help${NC}       # Show commands"

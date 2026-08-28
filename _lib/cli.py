@@ -19,35 +19,14 @@ sys.path.insert(0, str(lib_dir))
 
 from _lib import __version__
 from _lib.utils.ui import (
-    console, banner, success_box, error_box, 
+    console, banner, success_box, error_box,
     info_box, module_table, status_table, interactive_menu
 )
 from _lib.utils import SHADOW_DATA, ensure_dirs
-from _lib.commands import get_command, get_all_commands
+from _lib.modules.loader import load_modules
 
-# Import modules
-from _lib.modules.shell import ShellModule
-from _lib.modules.tools import ToolsModule
-from _lib.modules.fonts import FontsModule
-from _lib.modules.dotfiles import DotfilesModule
-from _lib.modules.aliases import AliasesModule
-
-MODULES = {
-    "shell": ShellModule(),
-    "tools": ToolsModule(),
-    "fonts": FontsModule(),
-    "dotfiles": DotfilesModule(),
-    "aliases": AliasesModule(),
-}
-
-# Metadata for each module (dynamic help)
-MODULE_META = {
-    "shell": {"package": "zsh, git", "config": "~/.oh-my-zsh, ~/.p10k.zsh"},
-    "tools": {"package": "pkg", "config": ""},
-    "fonts": {"package": "curl", "config": "~/.termux/font.ttf"},
-    "dotfiles": {"package": "", "config": "~/.zshrc, ~/.nanorc, ~/.termux/*"},
-    "aliases": {"package": "", "config": "~/.zshrc (source aliases.sh)"},
-}
+# Dynamic module loading
+MODULES = load_modules()
 
 def show_help():
     """Display help information."""
@@ -55,21 +34,30 @@ def show_help():
     console.print("[bold]Usage:[/bold] sw [command]")
     console.print()
     console.print("[bold]Commands:[/bold]")
-    for cmd in get_all_commands():
-        console.print(f"  [cyan]{cmd.name:<14}[/cyan] {cmd.description}")
+    console.print("  [cyan]install[reset]        Install a module")
+    console.print("  [cyan]update[reset]         Update module(s)")
+    console.print("  [cyan]uninstall[reset]      Uninstall a module")
+    console.print("  [cyan]list[reset]           List available modules")
+    console.print("  [cyan]status[reset]         Show module status")
+    console.print("  [cyan]rice[reset]           Manage RICE themes")
+    console.print("  [cyan]update-core[reset]    Update framework from GitHub")
+    console.print("  [cyan]version[reset]        Show version info")
     console.print()
     console.print("[bold]Modules:[/bold]")
-    for name, mod in MODULES.items():
-        meta = MODULE_META.get(name, {})
-        pkg = meta.get("package", "")
-        pkg_info = f" [dim]({pkg})[/dim]" if pkg else ""
-        console.print(f"  [cyan]•[/cyan] {name} — {mod.description}{pkg_info}")
+    for name, mod in sorted(MODULES.items()):
+        console.print(f"  [cyan]{name}[/cyan] — {mod.description}")
+    console.print()
+    console.print("[bold]RICE:[/bold]")
+    console.print("  [cyan]rice list[reset]      List available RICEs")
+    console.print("  [cyan]rice set[reset]       Set active RICE")
+    console.print("  [cyan]rice install[reset]   Install RICE from git")
     console.print()
     console.print("[bold]Examples:[/bold]")
     console.print("  sw                     # Interactive menu")
     console.print("  sw install shell       # Install zsh + plugins")
     console.print("  sw update              # Update all modules")
     console.print("  sw status              # Show all status")
+    console.print("  sw rice set kawaii     # Activate kawaii RICE")
     console.print()
     console.print("[dim]Shadow-TermDev · https://Shadow-TermDev.github.io[/dim]")
 
@@ -77,7 +65,7 @@ def list_modules():
     """List all available modules."""
     banner()
     modules_info = {}
-    for name, mod in MODULES.items():
+    for name, mod in sorted(MODULES.items()):
         status = mod.status()
         modules_info[name] = {
             "description": mod.description,
@@ -128,7 +116,7 @@ def show_status(module_names: list[str] = None):
             console.print(f"  [bold]{name}:[/bold] {status.get('details', 'unknown')}")
     else:
         status_data = {}
-        for name, mod in MODULES.items():
+        for name, mod in sorted(MODULES.items()):
             status = mod.status()
             status_data[name] = {
                 "status": "ok" if status.get("status") == "ok" else "missing",
@@ -137,31 +125,31 @@ def show_status(module_names: list[str] = None):
         status_table(status_data)
 
 def update_core():
-    """Update Shadow-SetUp from GitHub with clean progress."""
+    """Update Shadow-SetUp from GitHub."""
     import subprocess
     import shutil
-    
+
     banner()
-    
+
     temp_dir = SHADOW_DATA / "cache" / "shadow-update"
-    
+
     with console.status("[bold cyan]Downloading update...[/bold cyan]", spinner="dots") as status:
         try:
             if temp_dir.exists():
                 shutil.rmtree(temp_dir)
-            
+
             result = subprocess.run([
                 "git", "clone", "--depth=1",
                 "https://github.com/Shadow-TermDev/Shadow-SetUp.git",
                 str(temp_dir)
             ], capture_output=True, text=True)
-            
+
             if result.returncode != 0:
                 error_box("Update failed", "Could not download update")
                 return
-            
+
             status.update("[bold cyan]Installing files...[/bold cyan]")
-            
+
             # Copy _lib
             lib_src = temp_dir / "_lib"
             lib_dst = SHADOW_DATA / "_lib"
@@ -169,7 +157,7 @@ def update_core():
                 if lib_dst.exists():
                     shutil.rmtree(lib_dst)
                 shutil.copytree(lib_src, lib_dst)
-            
+
             # Copy dotfiles
             dotfiles_src = temp_dir / "dotfiles"
             dotfiles_dst = SHADOW_DATA / "dotfiles"
@@ -177,57 +165,124 @@ def update_core():
                 if dotfiles_dst.exists():
                     shutil.rmtree(dotfiles_dst)
                 shutil.copytree(dotfiles_src, dotfiles_dst)
-            
+
             # Copy .version
             version_src = temp_dir / ".version"
             version_dst = SHADOW_DATA / ".version"
             if version_src.exists():
                 shutil.copy2(version_src, version_dst)
-            
+
             # Update wrappers
             bin_dir = Path.home() / ".local" / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            
+
             for cmd_name in ["sw", "shadow"]:
                 wrapper = bin_dir / cmd_name
                 wrapper.write_text(f"""#!/data/data/com.termux/files/usr/bin/bash
 exec python3 "{SHADOW_DATA}/_lib/cli.py" "$@"
 """)
                 wrapper.chmod(0o755)
-            
+
             shutil.rmtree(temp_dir)
-            
+
         except Exception as e:
             error_box("Update failed", str(e))
             return
-    
+
     success_box("Update complete!", "Shadow-SetUp is now up to date")
+
+# RICE commands
+def rice_list():
+    """List available RICEs (official + local)."""
+    from _lib.utils.rice_manager import fetch_official_rices, list_local_rices, get_active_rice
+
+    banner()
+    official = fetch_official_rices()
+    local = list_local_rices()
+    local_names = {r["name"] for r in local}
+    active = get_active_rice()
+
+    console.print("[bold]Official RICEs:[/bold]")
+    for name, info in sorted(official.items()):
+        installed = " [dim]+installed[/dim]" if name in local_names else ""
+        marker = " [green]*[/green]" if name == active else ""
+        console.print(f"  [cyan]{name}[/cyan]{marker}{installed} — {info.get('description', '')}")
+
+    if local:
+        console.print()
+        console.print("[bold]Local RICEs:[/bold]")
+        for rice in local:
+            if rice["name"] not in official:
+                marker = " [green]*[/green]" if rice["name"] == active else ""
+                console.print(f"  [cyan]{rice['name']}[/cyan]{marker}")
+
+    console.print()
+    console.print("[dim]* = active | + = downloaded[/dim]")
+
+def rice_set(rice_name: str):
+    """Download (if needed) and activate a RICE."""
+    from _lib.utils.rice_manager import download_and_apply_rice
+    banner()
+    download_and_apply_rice(rice_name)
+
+def rice_install(url: str):
+    """Install a custom RICE from git URL."""
+    from _lib.utils.rice_manager import install_custom_rice
+    banner()
+    install_custom_rice(url)
+
+def rice_delete(rice_name: str):
+    """Delete a local RICE."""
+    from _lib.utils.rice_manager import delete_rice
+    banner()
+    delete_rice(rice_name)
+
+def rice_backup(rice_name: str):
+    """Backup current RICE."""
+    from _lib.utils.rice_manager import backup_current_rice
+    banner()
+    backup_current_rice(rice_name)
+
+def handle_rice(args: list[str]):
+    """Handle rice subcommands."""
+    if not args or args[0] == "list":
+        rice_list()
+    elif args[0] == "set" and len(args) > 1:
+        rice_set(args[1])
+    elif args[0] == "install" and len(args) > 1:
+        rice_install(args[1])
+    elif args[0] == "delete" and len(args) > 1:
+        rice_delete(args[1])
+    elif args[0] == "backup" and len(args) > 1:
+        rice_backup(args[1])
+    else:
+        error_box("Error", "Usage: rice [list|set|install|delete|backup] [args]")
 
 def run_interactive():
     """Run interactive TUI menu."""
     from InquirerPy import inquirer
-    
+
     while True:
         try:
             action = interactive_menu()
-            
+
             if action == "exit":
                 console.print("[dim]Bye![/dim]")
                 break
-            
+
             console.clear()
-            
+
             if action == "install":
-                choices = list(MODULES.keys()) + ["[cancel]"]
+                choices = sorted(MODULES.keys()) + ["[cancel]"]
                 selected = inquirer.checkbox(
                     message="Select modules to install:",
                     choices=choices,
                 ).execute()
                 if selected and "[cancel]" not in selected:
                     install_modules(selected)
-            
+
             elif action == "update":
-                choices = list(MODULES.keys()) + ["all", "[cancel]"]
+                choices = sorted(MODULES.keys()) + ["all", "[cancel]"]
                 selected = inquirer.checkbox(
                     message="Select modules to update:",
                     choices=choices,
@@ -237,33 +292,86 @@ def run_interactive():
                         update_modules()
                     else:
                         update_modules(selected)
-            
+
             elif action == "uninstall":
-                choices = list(MODULES.keys()) + ["[cancel]"]
+                choices = sorted(MODULES.keys()) + ["[cancel]"]
                 selected = inquirer.checkbox(
                     message="Select modules to uninstall:",
                     choices=choices,
                 ).execute()
                 if selected and "[cancel]" not in selected:
                     uninstall_modules(selected)
-            
+
             elif action == "list":
                 list_modules()
-            
+
             elif action == "status":
                 show_status()
-            
+
+            elif action == "rice":
+                # RICE submenu
+                from InquirerPy import inquirer
+                rice_choices = [
+                    {"name": "[1] List RICEs", "value": "list"},
+                    {"name": "[2] Set/Download RICE", "value": "set"},
+                    {"name": "[3] Install from git URL", "value": "install"},
+                    {"name": "[4] Delete local RICE", "value": "delete"},
+                    {"name": "[5] Backup current", "value": "backup"},
+                    {"name": "[x] Back", "value": "back"},
+                ]
+                rice_action = inquirer.select(
+                    message="RICE manager:",
+                    choices=rice_choices,
+                ).execute()
+
+                if rice_action == "list":
+                    rice_list()
+                elif rice_action == "set":
+                    from _lib.utils.rice_manager import fetch_official_rices
+                    official = fetch_official_rices()
+                    rice_names = list(official.keys()) + ["[cancel]"]
+                    selected = inquirer.select(
+                        message="Select RICE to activate:",
+                        choices=rice_names,
+                    ).execute()
+                    if selected and selected != "[cancel]":
+                        rice_set(selected)
+                elif rice_action == "install":
+                    url = inquirer.text(message="Git URL:").execute()
+                    if url:
+                        rice_install(url)
+                elif rice_action == "delete":
+                    from _lib.utils.rice_manager import list_local_rices
+                    local = list_local_rices()
+                    if local:
+                        names = [r["name"] for r in local] + ["[cancel]"]
+                        selected = inquirer.select(
+                            message="Select RICE to delete:",
+                            choices=names,
+                        ).execute()
+                        if selected and selected != "[cancel]":
+                            rice_delete(selected)
+                    else:
+                        info_box("RICEs", "No local RICEs to delete")
+                elif rice_action == "backup":
+                    from _lib.utils.rice_manager import get_active_rice
+                    active = get_active_rice()
+                    if active:
+                        rice_backup(active)
+                    else:
+                        info_box("RICEs", "No active RICE to backup")
+
             elif action == "update-core":
                 update_core()
-            
+
             elif action == "version":
                 console.print(f"Shadow-SetUp v{__version__}")
-            
+
             # Pause before returning to menu
             if action != "exit":
                 console.print()
                 input("Press Enter to continue...")
-        
+
         except KeyboardInterrupt:
             console.print("\n[dim]Cancelled[/dim]")
             continue
@@ -274,27 +382,27 @@ def run_interactive():
 def main():
     """Main entry point."""
     ensure_dirs()
-    
+
     args = sys.argv[1:]
-    
+
     # No args = interactive mode
     if not args:
         run_interactive()
         return
-    
+
     command = args[0]
     module_args = args[1:] if len(args) > 1 else []
-    
+
     # Commands that need full UI
-    NEEDS_BANNER = {"list", "install", "update", "uninstall", "status", "update-core"}
-    
+    NEEDS_BANNER = {"list", "install", "update", "uninstall", "status", "update-core", "rice"}
+
     if command in NEEDS_BANNER:
         console.clear()
-    
+
     try:
-        if command == "help" or command == "--help" or command == "-h":
+        if command in ("help", "--help", "-h"):
             show_help()
-        elif command == "version" or command == "--version":
+        elif command in ("version", "--version"):
             console.print(f"Shadow-SetUp v{__version__}")
         elif command == "list":
             list_modules()
@@ -317,6 +425,8 @@ def main():
             uninstall_modules(module_args)
         elif command == "status":
             show_status(module_args if module_args else None)
+        elif command == "rice":
+            handle_rice(module_args)
         else:
             error_box("Error", f"Unknown command: {command}")
             show_help()
