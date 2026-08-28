@@ -1,5 +1,6 @@
 """Shell module — zsh + Oh My Zsh + Powerlevel10k + plugins."""
 
+import shutil
 import subprocess
 from pathlib import Path
 from _lib.modules import BaseModule
@@ -66,7 +67,7 @@ class ShellModule(BaseModule):
                     run_cmd(["git", "-C", str(plugin_dir), "pull"], check=True)
             
             current_shell = run_cmd(["sh", "-c", "echo $SHELL"], capture=True).stdout.strip()
-            zsh_path = run_cmd(["which", "zsh"], capture=True).stdout.strip()
+            zsh_path = shutil.which("zsh") or ""
             if current_shell != zsh_path:
                 console.print("  [info]Setting zsh as default shell...[/info]")
                 run_cmd(["chsh", "-s", "zsh"])
