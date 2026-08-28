@@ -92,7 +92,7 @@ class RiceCommand(Command):
         from _lib.utils.ui import banner
         from _lib.utils.rice_manager import backup_current_rice
         banner()
-        backup_current_rice(rice_name)
+        backup_current_rice(rice_name, ask=True)
 
     def _rice_check(self) -> None:
         from _lib.utils.ui import console, banner, success_box, error_box

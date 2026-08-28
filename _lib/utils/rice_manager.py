@@ -223,11 +223,25 @@ def apply_rice_files(rice_name: str) -> bool:
         error_box("Rice", f"Apply failed: {e}")
         return False
 
-def backup_current_rice(rice_name: str) -> bool:
+def backup_current_rice(rice_name: str, ask: bool = True) -> bool:
     """Backup the current RICE before switching."""
     ensure_dirs()
 
+    # Clean old backups first
+    for old_backup in BACKUP_DIR.glob("*.sh"):
+        old_backup.unlink()
+
     backup_file = BACKUP_DIR / f"{rice_name}.sh"
+    
+    if ask:
+        try:
+            from _lib.utils.ui import console
+            result = console.input(f"  [bold]Backup current RICE '{rice_name}'? [Y/n]: [/bold]").strip()
+            if result.lower() == "n":
+                return True
+        except (EOFError, KeyboardInterrupt):
+            return True
+
     try:
         if ACTIVE_RICE_LINK.exists():
             shutil.copy2(ACTIVE_RICE_LINK, backup_file)
@@ -249,6 +263,8 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = True) -> bool:
         active = get_active_rice()
         if active and active != rice_name and keep_backup:
             backup_current_rice(active)
+        elif active and active != rice_name and not keep_backup:
+            backup_current_rice(active, ask=False)
         if apply_rice_files(rice_name):
             success_box("Rice", f"'{rice_name}' activated")
             return True
