@@ -20,13 +20,16 @@ info() { echo -e "${CYAN}[>>]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!!]${NC} $1"; }
 fail() { echo -e "${RED}[XX]${NC} $1"; exit 1; }
 
+# Trap Ctrl+C
+trap 'echo -e "\n${YELLOW}[!!]${NC} Cancelled"; exit 1' INT
+
 # -----------------------------------------------
 # Banner
 # -----------------------------------------------
 clear
 echo -e "${CYAN}${BOLD}"
 echo "  ╔═══════════════════════════════════════╗"
-echo "  ║           Shadow-SetUp v2             ║"
+echo "  ║       Shadow-SetUp                    ║"
 echo "  ╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "  ${BOLD}Modular Termux Environment Manager${NC}"
@@ -169,10 +172,9 @@ echo "  [2] Minimal (shell + tools only)"
 echo "  [3] Custom (choose modules)"
 echo "  [4] Skip (configure later)"
 echo ""
-read -p "  Choice [1]: " choice
-choice="${choice:-1}"
+read -p "  Choice [1]: " choice="${choice:-1}"
 
-case "$choice" in
+case "${choice:-1}" in
     1)
         python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases
         ;;
@@ -182,8 +184,8 @@ case "$choice" in
     3)
         echo ""
         echo "Available modules: shell, tools, fonts, dotfiles, aliases"
-        read -p "  Modules (space-separated): " modules
-        python3 "$SHADOW_DATA/_lib/cli.py" install $modules
+        read -p "  Modules (space-separated): " modules=""
+        [ -n "$modules" ] && python3 "$SHADOW_DATA/_lib/cli.py" install $modules
         ;;
     4)
         info "Skipping setup. Run 'sw install <module>' later."
@@ -195,25 +197,21 @@ case "$choice" in
 esac
 
 # -----------------------------------------------
-# RICE selection (detect existing config)
+# RICE selection
 # -----------------------------------------------
 ACTIVE_RICE_LINK="$SHADOW_DATA/active_rice.sh"
 CURRENT_RICE=""
 
 if [ -f "$ACTIVE_RICE_LINK" ]; then
-    # Try to detect current RICE name
-    if [ -L "$ACTIVE_RICE_LINK" ]; then
-        CURRENT_RICE=$(basename "$(dirname "$(readlink -f "$ACTIVE_RICE_LINK")")")
-    else
-        for rice_dir in "$SHADOW_DATA/dotfiles/rices"/*/; do
-            if [ -f "$rice_dir/rice.sh" ]; then
-                if diff -q "$ACTIVE_RICE_LINK" "$rice_dir/rice.sh" &>/dev/null; then
-                    CURRENT_RICE=$(basename "$rice_dir")
-                    break
-                fi
+    for rice_dir in "$SHADOW_DATA/dotfiles/rices"/*/; do
+        [ -d "$rice_dir" ] || continue
+        if [ -f "$rice_dir/rice.sh" ]; then
+            if diff -q "$ACTIVE_RICE_LINK" "$rice_dir/rice.sh" &>/dev/null; then
+                CURRENT_RICE=$(basename "$rice_dir")
+                break
             fi
-        done
-    fi
+        fi
+    done
 fi
 
 echo ""
@@ -225,17 +223,17 @@ if [ -n "$CURRENT_RICE" ]; then
     echo "  [2] Change RICE"
     echo "  [3] Skip"
     echo ""
-    read -p "  Choice [1]: " rice_choice
+    read -p "  Choice [1]: " rice_choice=""
     rice_choice="${rice_choice:-1}"
 
-    if [ "$rice_choice" -eq 2 ]; then
-        # Show available RICEs
+    if [ "$rice_choice" = "2" ]; then
         echo ""
         RICES_DIR="$SHADOW_DATA/dotfiles/rices"
         RICE_OPTS=()
         RICE_NUM=1
 
         for rice_dir in "$RICES_DIR"/*/; do
+            [ -d "$rice_dir" ] || continue
             if [ -f "$rice_dir/rice.sh" ]; then
                 rice_name=$(basename "$rice_dir")
                 echo "  [$RICE_NUM] $rice_name"
@@ -245,7 +243,7 @@ if [ -n "$CURRENT_RICE" ]; then
         done
 
         echo ""
-        read -p "  Choice [1]: " rice_choice2
+        read -p "  Choice [1]: " rice_choice2=""
         rice_choice2="${rice_choice2:-1}"
 
         if [ "$rice_choice2" -ge 1 ] && [ "$rice_choice2" -lt "$RICE_NUM" ] 2>/dev/null; then
@@ -254,21 +252,16 @@ if [ -n "$CURRENT_RICE" ]; then
         else
             warn "Invalid choice, keeping current..."
         fi
-    elif [ "$rice_choice" -eq 3 ]; then
-        info "Keeping current RICE"
     else
         info "Keeping current RICE"
     fi
 else
-    # No RICE configured, show selection
-    echo -e "${BOLD}Select a RICE theme:${NC}"
-    echo ""
-
     RICES_DIR="$SHADOW_DATA/dotfiles/rices"
     RICE_OPTS=()
     RICE_NUM=1
 
     for rice_dir in "$RICES_DIR"/*/; do
+        [ -d "$rice_dir" ] || continue
         if [ -f "$rice_dir/rice.sh" ]; then
             rice_name=$(basename "$rice_dir")
             echo "  [$RICE_NUM] $rice_name"
@@ -279,10 +272,10 @@ else
 
     echo "  [$RICE_NUM] Skip (no RICE)"
     echo ""
-    read -p "  Choice [1]: " rice_choice
+    read -p "  Choice [1]: " rice_choice=""
     rice_choice="${rice_choice:-1}"
 
-    if [ "$rice_choice" -eq "$RICE_NUM" ] 2>/dev/null; then
+    if [ "$rice_choice" = "$RICE_NUM" ]; then
         info "No RICE selected"
     elif [ "$rice_choice" -ge 1 ] && [ "$rice_choice" -lt "$RICE_NUM" ] 2>/dev/null; then
         selected_rice="${RICE_OPTS[$((rice_choice-1))]}"
