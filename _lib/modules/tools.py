@@ -49,10 +49,13 @@ class ToolsModule(BaseModule):
     def update(self) -> bool:
         try:
             info_box("Updating tools", "Running pkg update...")
-            run_cmd(["pkg", "update", "-y"], capture=True)
-            run_cmd(["pkg", "upgrade", "-y"], capture=True)
+            run_cmd(["pkg", "update", "-y"], capture=True, timeout=300)
+            run_cmd(["pkg", "upgrade", "-y"], capture=True, timeout=300)
             success_box("Tools module", "Update complete!")
             return True
+        except subprocess.TimeoutExpired:
+            error_box("Tools module", "Update timed out")
+            return False
         except Exception as e:
             error_box("Tools module", f"Error: {str(e)}")
             return False

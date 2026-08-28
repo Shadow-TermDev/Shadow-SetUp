@@ -195,32 +195,38 @@ case "$choice" in
 esac
 
 # -----------------------------------------------
-# RICE selection (download on-demand)
+# RICE selection (only available RICEs)
 # -----------------------------------------------
 echo ""
 echo -e "${BOLD}Select a RICE theme:${NC}"
 echo ""
-echo "  [1] default     - Clean, minimal theme"
-echo "  [2] kawaii      - Cute theme with TTS"
-echo "  [3] cyberpunk   - Neon futuristic theme"
-echo "  [4] minimal     - No animations, pure speed"
-echo "  [5] hacker      - Matrix-style green"
-echo "  [6] term-shadow - Personal theme (argonaut)"
-echo "  [7] Skip (no RICE)"
+
+RICES_DIR="$SHADOW_DATA/dotfiles/rices"
+RICE_OPTS=()
+RICE_NUM=1
+
+for rice_dir in "$RICES_DIR"/*/; do
+    if [ -f "$rice_dir/rice.sh" ]; then
+        rice_name=$(basename "$rice_dir")
+        echo "  [$RICE_NUM] $rice_name"
+        RICE_OPTS+=("$rice_name")
+        RICE_NUM=$((RICE_NUM + 1))
+    fi
+done
+
+echo "  [$RICE_NUM] Skip (no RICE)"
 echo ""
 read -p "  Choice [1]: " rice_choice
 rice_choice="${rice_choice:-1}"
 
-case "$rice_choice" in
-    1) python3 "$SHADOW_DATA/_lib/cli.py" rice set default ;;
-    2) python3 "$SHADOW_DATA/_lib/cli.py" rice set kawaii ;;
-    3) python3 "$SHADOW_DATA/_lib/cli.py" rice set cyberpunk ;;
-    4) python3 "$SHADOW_DATA/_lib/cli.py" rice set minimal ;;
-    5) python3 "$SHADOW_DATA/_lib/cli.py" rice set hacker ;;
-    6) python3 "$SHADOW_DATA/_lib/cli.py" rice set term-shadow ;;
-    7) info "No RICE selected" ;;
-    *) warn "Invalid choice, using default..." && python3 "$SHADOW_DATA/_lib/cli.py" rice set default ;;
-esac
+if [ "$rice_choice" -eq "$RICE_NUM" ] 2>/dev/null; then
+    info "No RICE selected"
+elif [ "$rice_choice" -ge 1 ] && [ "$rice_choice" -lt "$RICE_NUM" ] 2>/dev/null; then
+    selected_rice="${RICE_OPTS[$((rice_choice-1))]}"
+    python3 "$SHADOW_DATA/_lib/cli.py" rice set "$selected_rice"
+else
+    warn "Invalid choice, skipping..."
+fi
 
 # -----------------------------------------------
 # Final

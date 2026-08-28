@@ -87,21 +87,25 @@ class ShellModule(BaseModule):
             info_box("Updating shell module", "Pulling latest changes...")
             
             if OH_MY_ZSH.exists():
-                run_cmd(["git", "-C", str(OH_MY_ZSH), "pull", "--quiet"], capture=True)
+                run_cmd(["git", "-C", str(OH_MY_ZSH), "pull", "--quiet"], capture=True, timeout=30)
             
             p10k_dir = OH_MY_ZSH / "custom" / "themes" / "powerlevel10k"
             if p10k_dir.exists():
-                run_cmd(["git", "-C", str(p10k_dir), "pull", "--quiet"], capture=True)
+                run_cmd(["git", "-C", str(p10k_dir), "pull", "--quiet"], capture=True, timeout=30)
             
             plugins_dir = OH_MY_ZSH / "custom" / "plugins"
             if plugins_dir.exists():
                 for plugin_dir in plugins_dir.iterdir():
                     if (plugin_dir / ".git").exists():
-                        run_cmd(["git", "-C", str(plugin_dir), "pull", "--quiet"], capture=True)
+                        run_cmd(["git", "-C", str(plugin_dir), "pull", "--quiet"], capture=True, timeout=30)
             
             success_box("Shell module", "Update complete!")
             return True
-            
+        
+        except subprocess.TimeoutExpired:
+            error_box("Shell module", "Update timed out")
+            return False
+        
         except Exception as e:
             error_box("Shell module", f"Error: {str(e)}")
             return False
