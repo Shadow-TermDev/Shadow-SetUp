@@ -152,6 +152,27 @@ case "$choice" in
 esac
 
 # -----------------------------------------------
+# Helper: install default RICE if no local RICEs exist
+install_default_if_needed() {
+    LOCAL_RICES="$SHADOW_DATA/dotfiles/rices"
+    HAS_RICES=false
+    if [ -d "$LOCAL_RICES" ]; then
+        for d in "$LOCAL_RICES"/*; do
+            [ -d "$d" ] && [ -f "$d/rice.sh" ] && HAS_RICES=true && break
+        done
+    fi
+    
+    if [ "$HAS_RICES" = false ] && [ -d "$REPO_RICES/default" ]; then
+        mkdir -p "$SHADOW_DATA/dotfiles/rices"
+        cp -r "$REPO_RICES/default" "$SHADOW_DATA/dotfiles/rices/"
+        info "Installing default RICE..."
+        python3 "$SHADOW_DATA/_lib/cli.py" rice set default < /dev/tty
+    else
+        info "Keeping current setup"
+    fi
+}
+
+# -----------------------------------------------
 # RICE selection — ONLY COPY SELECTED ONE
 # -----------------------------------------------
 echo ""
@@ -183,23 +204,8 @@ else
     rice_input="${rice_input:-1}"
 
     if [ "$rice_input" = "s" ] || [ "$rice_input" = "S" ]; then
-        # Install default RICE if no RICEs exist locally
-        LOCAL_RICES="$SHADOW_DATA/dotfiles/rices"
-        HAS_RICES=false
-        if [ -d "$LOCAL_RICES" ]; then
-            for d in "$LOCAL_RICES"/*; do
-                [ -d "$d" ] && [ -f "$d/rice.sh" ] && HAS_RICES=true && break
-            done
-        fi
-        
-        if [ "$HAS_RICES" = false ] && [ -d "$REPO_RICES/default" ]; then
-            mkdir -p "$SHADOW_DATA/dotfiles/rices"
-            cp -r "$REPO_RICES/default" "$SHADOW_DATA/dotfiles/rices/"
-            info "Installing default RICE..."
-            python3 "$SHADOW_DATA/_lib/cli.py" rice set default < /dev/tty
-        else
-            info "Keeping current setup"
-        fi
+        # Skip: install default only if no RICEs exist
+        install_default_if_needed
     elif [[ "$rice_input" =~ ^[0-9]+$ ]] && [ "$rice_input" -ge 1 ] && [ "$rice_input" -le "$RICE_COUNT" ]; then
         PICKED="${RICE_LIST[$((rice_input-1))]}"
         # Copy ONLY this RICE
@@ -208,12 +214,9 @@ else
         info "Installing '$PICKED'..."
         python3 "$SHADOW_DATA/_lib/cli.py" rice set "$PICKED" < /dev/tty
     else
-        warn "Invalid choice, installing default..."
-        if [ -d "$REPO_RICES/default" ]; then
-            mkdir -p "$SHADOW_DATA/dotfiles/rices"
-            cp -r "$REPO_RICES/default" "$SHADOW_DATA/dotfiles/rices/"
-            python3 "$SHADOW_DATA/_lib/cli.py" rice set default < /dev/tty
-        fi
+        # Invalid: install default only if no RICEs exist
+        warn "Invalid choice, using default..."
+        install_default_if_needed
     fi
 fi
 
