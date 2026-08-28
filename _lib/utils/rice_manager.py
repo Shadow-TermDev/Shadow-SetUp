@@ -241,10 +241,6 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = True) -> bool:
 
     if rice_name in official:
         rice_info = official[rice_name]
-        # Check if it's local only
-        if rice_info.get("local"):
-            error_box("Rice", f"'{rice_name}' not downloaded. Run: sw install fonts (or copy to {RICES_DIR}/{rice_name}/)")
-            return False
     else:
         error_box("Rice", f"'{rice_name}' not found. Use 'sw rice install <url>' for custom RICEs.")
         return False
@@ -254,7 +250,7 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = True) -> bool:
     if active and active != rice_name and keep_backup:
         backup_current_rice(active)
 
-    # Download
+    # Download (works for both local and remote RICEs)
     console.print(f"  [cyan]Downloading '{rice_name}'...[/cyan]")
     if not download_rice(rice_name, rice_info):
         return False
