@@ -65,9 +65,9 @@ ok "Dependencies ready"
 # -----------------------------------------------
 info "Installing Python packages..."
 
-pip install --user rich colorama pyfiglet &>/dev/null || {
+pip install --user rich colorama &>/dev/null || {
     warn "pip install failed, trying with pkg..."
-    pkg install -y python-rich python-colorama python-pyfiglet &>/dev/null || warn "Some packages may not be available"
+    pkg install -y python-rich python-colorama &>/dev/null || warn "Some packages may not be available"
 }
 
 ok "Python packages installed"

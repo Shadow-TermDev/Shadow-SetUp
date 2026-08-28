@@ -1,9 +1,8 @@
-"""Dynamic UI components using Rich + pyfiglet with zoom detection."""
+"""Dynamic UI components using Rich with zoom detection."""
 
 import os
 import sys
 import shutil
-import pyfiglet
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -41,30 +40,41 @@ def get_terminal_width() -> int:
 def get_zoom_level() -> str:
     """Detect zoom level based on terminal width."""
     width = get_terminal_width()
-    if width >= 120:
+    if width >= 100:
         return "large"
-    elif width >= 80:
+    elif width >= 60:
         return "medium"
     else:
         return "small"
 
+# Custom logo art — compact and clean
+LOGO_LARGE = """[bold cyan]         ███████╗██╗  ██╗ █████╗ ██████╗  ██████╗ ██╗    ██╗[/bold cyan]
+[bold cyan]         ██╔════╝██║  ██║██╔══██╗██╔══██╗██╔═══██╗██║    ██║[/bold cyan]
+[bold cyan]         ███████╗███████║███████║██║  ██║██║   ██║██║ █╗ ██║[/bold cyan]
+[bold cyan]         ╚════██║██╔══██║██╔══██║██║  ██║██║   ██║██║███╗██║[/bold cyan]
+[bold cyan]         ███████║██║  ██║██║  ██║██████╔╝╚██████╔╝╚███╔███╔╝[/bold cyan]
+[bold cyan]         ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚══╝╚══╝[/bold cyan]"""
+
+LOGO_MEDIUM = """[bold cyan]        ╔═╗╦ ╦╦═╗╔═╗╔╦╗╔═╗╔═╗╔╦╗[/bold cyan]
+[bold cyan]        ║  ║ ║╠╦╝╠═╣ ║ ║╣ ╚═╗ ║[/bold cyan]
+[bold cyan]        ╚═╝╚═╝╩╚═╩ ╩ ╩ ╚═╝╚═╝ ╩[/bold cyan]"""
+
+LOGO_SMALL = "[bold cyan]🖤 Shadow-SetUp[/bold cyan]"
+
 def banner():
-    """Display Shadow-SetUp banner using pyfiglet with adaptive size."""
+    """Display Shadow-SetUp banner with adaptive size."""
     width = get_terminal_width()
     zoom = get_zoom_level()
     
-    try:
-        if zoom == "large":
-            ascii_art = pyfiglet.figlet_format("Shadow-SetUp", font="slant")
-        elif zoom == "medium":
-            ascii_art = pyfiglet.figlet_format("Shadow", font="standard")
-        else:
-            ascii_art = pyfiglet.figlet_format("SS", font="small")
-    except Exception:
-        ascii_art = "Shadow-SetUp"
+    if zoom == "large":
+        logo = LOGO_LARGE
+    elif zoom == "medium":
+        logo = LOGO_MEDIUM
+    else:
+        logo = LOGO_SMALL
     
-    for line in ascii_art.rstrip().split("\n"):
-        console.print(Align.center(f"[bold cyan]{line}[/bold cyan]"))
+    for line in logo.split("\n"):
+        console.print(Align.center(line))
     
     console.print(Align.center("[dim]Modular Termux Environment Manager[/dim]"))
     console.print()
