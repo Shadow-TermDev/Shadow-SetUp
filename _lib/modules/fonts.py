@@ -23,29 +23,16 @@ class FontsModule(BaseModule):
     REPO_URL = "https://github.com/ryanoasis/nerd-fonts/releases/latest/download"
     
     def install(self) -> bool:
-        """Install font — asks user for selection."""
+        """Install default font (JetBrains Mono)."""
         try:
-            info_box("Installing fonts", "Select a Nerd Font")
+            font_path = TERMUX_HOME / self.FONT_FILE
             
-            console.print("\n  Available fonts:")
-            for key, name in self.FONTS.items():
-                console.print(f"    [cyan]•[/cyan] {key} ({name})")
-            console.print(f"    [cyan]•[/cyan] [bold]keep[/bold] — Keep current font")
-            console.print()
+            if font_path.exists():
+                info_box("Font", "Font already installed, skipping")
+                return True
             
-            choice = console.input("  [bold]Which font? [jetbrains]: [/bold]").strip()
-            
-            if choice.lower() == "keep":
-                font_path = TERMUX_HOME / self.FONT_FILE
-                if font_path.exists():
-                    info_box("Font", "Keeping current font")
-                    return True
-                else:
-                    warning_box("Font", "No font installed yet, select one below")
-                    choice = ""
-            
-            choice = choice if choice in self.FONTS else "jetbrains"
-            return self._install_font(choice)
+            # Install default font
+            return self._install_font("jetbrains")
                     
         except Exception as e:
             error_box("Fonts module", f"Error: {str(e)}")
@@ -57,13 +44,9 @@ class FontsModule(BaseModule):
         font_url = f"{self.REPO_URL}/{font_name}NerdFont-Regular.ttf"
         font_path = TERMUX_HOME / self.FONT_FILE
         
-        # Backup existing
-        if font_path.exists():
-            backup_file(font_path)
-            console.print("  [warning]Existing font backed up[/warning]")
+        TERMUX_HOME.mkdir(parents=True, exist_ok=True)
         
         console.print(f"  [info]Downloading {font_name}...[/info]")
-        TERMUX_HOME.mkdir(parents=True, exist_ok=True)
         
         result = run_cmd(["curl", "-fsSL", font_url, "-o", str(font_path)])
         
@@ -95,10 +78,10 @@ class FontsModule(BaseModule):
         return True
     
     def update(self) -> bool:
-        """Update — just check status, don't ask for font selection."""
+        """Update — just check status."""
         font_path = TERMUX_HOME / self.FONT_FILE
         if font_path.exists():
-            info_box("Fonts module", "Font already installed, skipping")
+            info_box("Fonts module", "Font already installed")
             return True
         else:
             warning_box("Fonts module", "No font installed. Run: sw install fonts")

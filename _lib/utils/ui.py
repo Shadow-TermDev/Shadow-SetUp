@@ -1,8 +1,9 @@
-"""Dynamic UI components using Rich with zoom detection."""
+"""Dynamic UI components using Rich + pyfiglet with zoom detection."""
 
 import os
 import sys
 import shutil
+import pyfiglet
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -47,34 +48,23 @@ def get_zoom_level() -> str:
     else:
         return "small"
 
-# Custom logo art — compact and clean
-LOGO_LARGE = """[bold cyan]         ███████╗██╗  ██╗ █████╗ ██████╗  ██████╗ ██╗    ██╗[/bold cyan]
-[bold cyan]         ██╔════╝██║  ██║██╔══██╗██╔══██╗██╔═══██╗██║    ██║[/bold cyan]
-[bold cyan]         ███████╗███████║███████║██║  ██║██║   ██║██║ █╗ ██║[/bold cyan]
-[bold cyan]         ╚════██║██╔══██║██╔══██║██║  ██║██║   ██║██║███╗██║[/bold cyan]
-[bold cyan]         ███████║██║  ██║██║  ██║██████╔╝╚██████╔╝╚███╔███╔╝[/bold cyan]
-[bold cyan]         ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚══╝╚══╝[/bold cyan]"""
-
-LOGO_MEDIUM = """[bold cyan]        ╔═╗╦ ╦╦═╗╔═╗╔╦╗╔═╗╔═╗╔╦╗[/bold cyan]
-[bold cyan]        ║  ║ ║╠╦╝╠═╣ ║ ║╣ ╚═╗ ║[/bold cyan]
-[bold cyan]        ╚═╝╚═╝╩╚═╩ ╩ ╩ ╚═╝╚═╝ ╩[/bold cyan]"""
-
-LOGO_SMALL = "[bold cyan]🖤 Shadow-SetUp[/bold cyan]"
-
 def banner():
-    """Display Shadow-SetUp banner with adaptive size."""
+    """Display Shadow-SetUp banner using pyfiglet with adaptive size."""
     width = get_terminal_width()
     zoom = get_zoom_level()
     
-    if zoom == "large":
-        logo = LOGO_LARGE
-    elif zoom == "medium":
-        logo = LOGO_MEDIUM
-    else:
-        logo = LOGO_SMALL
+    try:
+        if zoom == "large":
+            ascii_art = pyfiglet.figlet_format("Shadow-SetUp", font="slant")
+        elif zoom == "medium":
+            ascii_art = pyfiglet.figlet_format("Shadow", font="small")
+        else:
+            ascii_art = pyfiglet.figlet_format("SS", font="small")
+    except Exception:
+        ascii_art = "Shadow-SetUp"
     
-    for line in logo.split("\n"):
-        console.print(Align.center(line))
+    for line in ascii_art.rstrip().split("\n"):
+        console.print(Align.center(f"[bold cyan]{line}[/bold cyan]"))
     
     console.print(Align.center("[dim]Modular Termux Environment Manager[/dim]"))
     console.print()
@@ -203,6 +193,28 @@ def status_table(status_data: dict):
     
     console.print(table)
 
-def clear_screen():
-    """Clear terminal screen."""
+def interactive_menu():
+    """Interactive TUI menu with arrow key navigation."""
+    from InquirerPy import inquirer
+    
+    choices = [
+        {"name": "📦  Install module", "value": "install"},
+        {"name": "🔄  Update modules", "value": "update"},
+        {"name": "🗑️   Uninstall module", "value": "uninstall"},
+        {"name": "📋  List modules", "value": "list"},
+        {"name": "📊  System status", "value": "status"},
+        {"name": "⬆️   Update framework", "value": "update-core"},
+        {"name": "ℹ️   Version info", "value": "version"},
+        {"name": "🚪  Exit", "value": "exit"},
+    ]
+    
     console.clear()
+    banner()
+    
+    action = inquirer.select(
+        message="What do you want to do?",
+        choices=choices,
+        default="install",
+    ).execute()
+    
+    return action

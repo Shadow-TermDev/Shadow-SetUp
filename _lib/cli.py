@@ -3,17 +3,9 @@
 Shadow-SetUp CLI — Modular Termux Environment Manager.
 
 Usage:
-    sw <command> [module...]
-    
-Commands:
-    install <module>   Install a module
-    update [module]    Update module(s)
-    uninstall <module> Uninstall a module
-    list               List available modules
-    status [module]    Show module status
-    update-core        Update Shadow-SetUp from GitHub
-    version            Show version
-    help               Show this help
+    sw              Interactive menu (TUI)
+    sw <command>    Run a command
+    sw -h, --help   Show help
 """
 
 import sys
@@ -28,9 +20,10 @@ sys.path.insert(0, str(lib_dir))
 from _lib import __version__
 from _lib.utils.ui import (
     console, banner, success_box, error_box, 
-    info_box, module_table, status_table
+    info_box, module_table, status_table, interactive_menu
 )
 from _lib.utils import SHADOW_DATA, ensure_dirs
+from _lib.commands import get_command, get_all_commands
 
 # Import modules
 from _lib.modules.shell import ShellModule
@@ -47,30 +40,38 @@ MODULES = {
     "aliases": AliasesModule(),
 }
 
+# Metadata for each module (dynamic help)
+MODULE_META = {
+    "shell": {"package": "zsh, git", "config": "~/.oh-my-zsh, ~/.p10k.zsh"},
+    "tools": {"package": "pkg", "config": ""},
+    "fonts": {"package": "curl", "config": "~/.termux/font.ttf"},
+    "dotfiles": {"package": "", "config": "~/.zshrc, ~/.nanorc, ~/.termux/*"},
+    "aliases": {"package": "", "config": "~/.zshrc (source aliases.sh)"},
+}
+
 def show_help():
     """Display help information."""
     banner()
-    console.print("[bold]Usage:[/bold] sw <command> [module]")
+    console.print("[bold]Usage:[/bold] sw [command]")
     console.print()
     console.print("[bold]Commands:[/bold]")
-    console.print("  install <module>   Install a module")
-    console.print("  update [module]    Update module(s)")
-    console.print("  uninstall <module> Uninstall a module")
-    console.print("  list               List available modules")
-    console.print("  status [module]    Show module status")
-    console.print("  update-core        Update Shadow-SetUp from GitHub")
-    console.print("  version            Show version")
-    console.print("  help               Show this help")
+    for cmd in get_all_commands():
+        console.print(f"  [cyan]{cmd.name:<14}[/cyan] {cmd.description}")
     console.print()
     console.print("[bold]Modules:[/bold]")
     for name, mod in MODULES.items():
-        console.print(f"  [cyan]•[/cyan] {name} — {mod.description}")
+        meta = MODULE_META.get(name, {})
+        pkg = meta.get("package", "")
+        pkg_info = f" [dim]({pkg})[/dim]" if pkg else ""
+        console.print(f"  [cyan]•[/cyan] {name} — {mod.description}{pkg_info}")
     console.print()
     console.print("[bold]Examples:[/bold]")
-    console.print("  sw install shell    # Install zsh + plugins")
-    console.print("  sw update           # Update all modules")
-    console.print("  sw update shell     # Update only shell")
-    console.print("  sw status           # Show all status")
+    console.print("  sw                     # Interactive menu")
+    console.print("  sw install shell       # Install zsh + plugins")
+    console.print("  sw update              # Update all modules")
+    console.print("  sw status              # Show all status")
+    console.print()
+    console.print("[dim]Shadow-TermDev · https://Shadow-TermDev.github.io[/dim]")
 
 def list_modules():
     """List all available modules."""
@@ -161,7 +162,7 @@ def update_core():
             
             status.update("[bold cyan]Installing files...[/bold cyan]")
             
-            # Copy _lib (CLI code)
+            # Copy _lib
             lib_src = temp_dir / "_lib"
             lib_dst = SHADOW_DATA / "_lib"
             if lib_src.exists():
@@ -183,7 +184,7 @@ def update_core():
             if version_src.exists():
                 shutil.copy2(version_src, version_dst)
             
-            # Update wrapper scripts
+            # Update wrappers
             bin_dir = Path.home() / ".local" / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
             
@@ -194,7 +195,6 @@ exec python3 "{SHADOW_DATA}/_lib/cli.py" "$@"
 """)
                 wrapper.chmod(0o755)
             
-            # Clean up
             shutil.rmtree(temp_dir)
             
         except Exception as e:
@@ -203,14 +203,79 @@ exec python3 "{SHADOW_DATA}/_lib/cli.py" "$@"
     
     success_box("Update complete!", "Shadow-SetUp is now up to date")
 
+def run_interactive():
+    """Run interactive TUI menu."""
+    while True:
+        action = interactive_menu()
+        
+        if action == "exit":
+            console.print("[dim]Bye![/dim]")
+            break
+        
+        console.clear()
+        
+        if action == "install":
+            from InquirerPy import inquirer
+            choices = list(MODULES.keys()) + ["all"]
+            selected = inquirer.checkbox(
+                message="Select modules to install:",
+                choices=choices,
+            ).execute()
+            if selected:
+                if "all" in selected:
+                    install_modules(list(MODULES.keys()))
+                else:
+                    install_modules(selected)
+        
+        elif action == "update":
+            from InquirerPy import inquirer
+            choices = list(MODULES.keys()) + ["all"]
+            selected = inquirer.checkbox(
+                message="Select modules to update:",
+                choices=choices,
+            ).execute()
+            if selected:
+                if "all" in selected:
+                    update_modules()
+                else:
+                    update_modules(selected)
+        
+        elif action == "uninstall":
+            from InquirerPy import inquirer
+            choices = list(MODULES.keys())
+            selected = inquirer.checkbox(
+                message="Select modules to uninstall:",
+                choices=choices,
+            ).execute()
+            if selected:
+                uninstall_modules(selected)
+        
+        elif action == "list":
+            list_modules()
+        
+        elif action == "status":
+            show_status()
+        
+        elif action == "update-core":
+            update_core()
+        
+        elif action == "version":
+            console.print(f"Shadow-SetUp v{__version__}")
+        
+        # Pause before returning to menu
+        if action != "exit":
+            console.print()
+            input("Press Enter to continue...")
+
 def main():
     """Main entry point."""
     ensure_dirs()
     
     args = sys.argv[1:]
     
+    # No args = interactive mode
     if not args:
-        show_help()
+        run_interactive()
         return
     
     command = args[0]

@@ -30,6 +30,7 @@ echo "  ║         🖤  Shadow-SetUp  🖤          ║"
 echo "  ╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "  ${BOLD}Modular Termux Environment Manager${NC}"
+echo -e "  ${DIM}https://Shadow-TermDev.github.io${NC}"
 echo ""
 
 # -----------------------------------------------
@@ -65,7 +66,7 @@ ok "Dependencies ready"
 # -----------------------------------------------
 info "Installing Python packages..."
 
-pip install --user rich colorama &>/dev/null || {
+pip install --user rich colorama InquirerPy &>/dev/null || {
     warn "pip install failed, trying with pkg..."
     pkg install -y python-rich python-colorama &>/dev/null || warn "Some packages may not be available"
 }
@@ -85,7 +86,7 @@ mkdir -p "$SHADOW_BIN"
 ok "Directories ready"
 
 # -----------------------------------------------
-# Clone/update repo
+# Clone repo
 # -----------------------------------------------
 TEMP_DIR="$SHADOW_DATA/cache/shadow-install"
 
@@ -100,22 +101,26 @@ git clone --depth=1 https://github.com/Shadow-TermDev/Shadow-SetUp.git "$TEMP_DI
 ok "Repository downloaded"
 
 # -----------------------------------------------
-# Install files to ~/.shadow-setup/
+# Install files
 # -----------------------------------------------
 info "Installing files..."
 
-# Copy _lib (CLI code)
 if [ -d "$TEMP_DIR/_lib" ]; then
     rm -rf "$SHADOW_DATA/_lib"
     cp -r "$TEMP_DIR/_lib" "$SHADOW_DATA/_lib"
     ok "_lib installed"
 fi
 
-# Copy dotfiles
 if [ -d "$TEMP_DIR/dotfiles" ]; then
     rm -rf "$SHADOW_DATA/dotfiles"
     cp -r "$TEMP_DIR/dotfiles" "$SHADOW_DATA/dotfiles"
     ok "dotfiles installed"
+fi
+
+# Copy .version
+if [ -f "$TEMP_DIR/.version" ]; then
+    cp "$TEMP_DIR/.version" "$SHADOW_DATA/.version"
+    ok ".version installed"
 fi
 
 # -----------------------------------------------
@@ -133,7 +138,7 @@ EOF
 done
 
 # -----------------------------------------------
-# Ensure ~/.local/bin is in PATH
+# PATH setup
 # -----------------------------------------------
 info "Setting up PATH..."
 
@@ -155,10 +160,8 @@ fi
 rm -rf "$TEMP_DIR"
 
 # -----------------------------------------------
-# Run initial setup
+# Initial setup
 # -----------------------------------------------
-info "Running initial setup..."
-
 echo ""
 echo -e "${BOLD}What would you like to install?${NC}"
 echo ""
@@ -172,7 +175,7 @@ choice="${choice:-1}"
 
 case "$choice" in
     1)
-        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools fonts dotfiles aliases
+        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases
         ;;
     2)
         python3 "$SHADOW_DATA/_lib/cli.py" install shell tools
@@ -188,9 +191,58 @@ case "$choice" in
         ;;
     *)
         warn "Invalid choice, running full setup..."
-        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools fonts dotfiles aliases
+        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases
         ;;
 esac
+
+# -----------------------------------------------
+# Font selection (first-time only)
+# -----------------------------------------------
+echo ""
+echo -e "${BOLD}Select a Nerd Font for Termux:${NC}"
+echo ""
+echo "  1) JetBrains Mono  (default)"
+echo "  2) Fira Code"
+echo "  3) Hack"
+echo "  4) Iosevka"
+echo "  5) Meslo"
+echo "  6) Keep current font"
+echo ""
+read -p "  Choice [1]: " font_choice
+font_choice="${font_choice:-1}"
+
+FONT_DIR="$HOME/.termux"
+FONT_FILE="$FONT_DIR/font.ttf"
+REPO_URL="https://github.com/ryanoasis/nerd-fonts/releases/latest/download"
+
+declare -A FONTS=(
+    [1]="JetBrainsMono"
+    [2]="FiraCode"
+    [3]="Hack"
+    [4]="Iosevka"
+    [5]="MesloLGS"
+)
+
+if [ "$font_choice" != "6" ] && [ -n "${FONTS[$font_choice]:-}" ]; then
+    font_name="${FONTS[$font_choice]}"
+    info "Downloading $font_name..."
+    mkdir -p "$FONT_DIR"
+    
+    if curl -fsSL "$REPO_URL/${font_name}NerdFont-Regular.ttf" -o "$FONT_FILE"; then
+        ok "$font_name installed"
+        termux-reload-settings 2>/dev/null && ok "Termux settings reloaded"
+    else
+        # Fallback to repo font
+        if [ -f "$SHADOW_DATA/dotfiles/.termux/font.ttf" ]; then
+            cp "$SHADOW_DATA/dotfiles/.termux/font.ttf" "$FONT_FILE"
+            ok "Fallback font installed"
+        fi
+    fi
+elif [ "$font_choice" = "6" ]; then
+    info "Keeping current font"
+else
+    info "Invalid choice, keeping current font"
+fi
 
 # -----------------------------------------------
 # Final
@@ -198,8 +250,8 @@ esac
 echo ""
 echo -e "${GREEN}${BOLD}✓ Installation complete!${NC}"
 echo ""
-echo -e "  Run: ${BOLD}sw help${NC}"
-echo -e "  Or:  ${BOLD}sw install shell tools${NC}"
+echo -e "  Run: ${BOLD}sw${NC}           # Interactive menu"
+echo -e "  Or: ${BOLD}sw help${NC}       # Show commands"
 echo ""
-echo -e "  ${DIM}Tip: Add '$SHADOW_BIN' to your PATH if needed${NC}"
+echo -e "  ${DIM}Shadow-TermDev · https://Shadow-TermDev.github.io${NC}"
 echo ""
