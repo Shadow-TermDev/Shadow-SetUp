@@ -21,8 +21,8 @@ def ensure_dirs():
     SHADOW_CACHE.mkdir(parents=True, exist_ok=True)
     SHADOW_BACKUP.mkdir(parents=True, exist_ok=True)
 
-def run_cmd(cmd: list[str], capture: bool = False, check: bool = False) -> subprocess.CompletedProcess:
-    """Run a shell command."""
+def run_cmd(cmd: list[str], capture: bool = True, check: bool = False) -> subprocess.CompletedProcess:
+    """Run a shell command. Output hidden by default."""
     return subprocess.run(
         cmd,
         capture_output=capture,
