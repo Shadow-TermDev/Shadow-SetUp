@@ -1,13 +1,15 @@
-# 🖤 Shadow-SetUp
+# Shadow-SetUp
 
-A modular Termux environment manager with a modern Python CLI.
+A modular Termux environment manager with a modern Python CLI and dynamic command system.
 
 ## Features
 
 - **One-line install** — No need to clone the full repo
 - **Hidden config** — All files stored in `~/.shadow-setup/`
 - **Modular system** — Install only what you need
-- **Dynamic UI** — Beautiful terminal output with Rich + pyfiglet
+- **RICE system** — Complete themes with aliases, functions, and configs
+- **Dynamic commands** — Each command is a separate file, auto-discovered at runtime
+- **Dynamic TUI** — Menu generated from registered commands
 - **Auto-updates** — Update from GitHub without reinstalling
 
 ## Quick Installation
@@ -24,17 +26,46 @@ sw help
 
 ## Commands
 
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `sw install <module>` | `i` | Install a module |
+| `sw update [module]` | `u` | Update module(s) |
+| `sw uninstall <module>` | `rm` | Uninstall a module |
+| `sw list` | `ls` | List available modules |
+| `sw status [module]` | `st` | Show module status |
+| `sw rice` | | Manage RICE themes |
+| `sw update-core` | | Update framework from GitHub |
+| `sw version` | `v` | Show version info |
+| `sw help` | `--help`, `-h` | Show help |
+
+### RICE Commands
+
 | Command | Description |
 |---------|-------------|
-| `sw install <module>` | Install a module |
-| `sw update [module]` | Update module(s) |
-| `sw uninstall <module>` | Uninstall a module |
-| `sw list` | List available modules |
-| `sw status [module]` | Show module status |
-| `sw update-core` | Update framework from GitHub |
-| `sw version` | Show version |
+| `sw rice list` | List available RICEs |
+| `sw rice set <name>` | Set active RICE |
+| `sw rice install <url>` | Install RICE from git |
+| `sw rice check` | Show active RICE |
+| `sw rice delete <name>` | Delete local RICE |
+| `sw rice backup <name>` | Backup current RICE |
 
 > **Note:** `shadow` is also available as an alias for `sw`.
+
+## Interactive Menu
+
+Run `sw` with no arguments to open the TUI:
+
+```
+[1] Install module
+[2] Update modules
+[3] Uninstall module
+[4] List modules
+[5] System status
+[6] Manage RICEs
+[7] Update framework
+[8] Version info
+[x] Exit
+```
 
 ## Modules
 
@@ -43,56 +74,96 @@ sw help
 | `shell` | zsh + Oh My Zsh + Powerlevel10k + plugins |
 | `tools` | Essential packages (git, curl, bat, eza, fzf, etc.) |
 | `fonts` | Nerd Fonts for Termux (with "keep current" option) |
-| `dotfiles` | Configuration files (.zshrc, .p10k.zsh, .nanorc) |
+| `dotfiles` | Configuration files (.zshrc, aliases, functions) |
 | `aliases` | Shell aliases and functions |
 
-## Examples
+## RICE System
+
+RICEs are complete themes that include:
+- `rice.sh` — Startup animation, TTS greeting, environment variables
+- `.p10k.zsh` — Powerlevel10k prompt configuration
+- `aliases.sh` — RICE-specific aliases
+- `functions.sh` — RICE-specific functions
+- `colors.properties` — Terminal color scheme
+- `font.ttf` — Terminal font
+- `termux.properties` — Termux settings
+
+### Official RICEs
+
+| RICE | Theme | Description |
+|------|-------|-------------|
+| `term-shadow` | Argonaut | Personal theme — cyan/green, JetBrains Mono |
+| `default` | Ocean | Clean theme — blue/white, Fira Code |
+| `kawaii` | Pink Neon | Cute theme — magenta/pink, Hack Nerd Font |
+
+### Custom RICEs
+
+Install any RICE from a git repository:
 
 ```bash
-# Install everything
-sw install shell tools fonts dotfiles aliases
-
-# Install just shell
-sw install shell
-
-# Update all modules
-sw update
-
-# Update only shell
-sw update shell
-
-# Check status
-sw status
-
-# Update framework
-sw update-core
+sw rice install https://github.com/user/my-rice.git
 ```
 
 ## Project Structure
 
 ```
-~/.shadow-setup/           ← Hidden config directory
-├── _lib/                  ← CLI code
+~/.shadow-setup/              ← Hidden config directory
+├── _lib/                     ← CLI code
 │   ├── __init__.py
-│   ├── cli.py             ← CLI entry point
-│   ├── modules/
+│   ├── cli.py                ← CLI entry point
+│   ├── commands/             ← Dynamic command system
+│   │   ├── __init__.py       ← Command base class + loader
+│   │   ├── install.py
+│   │   ├── update.py
+│   │   ├── rice.py
+│   │   └── ...
+│   ├── modules/              ← Installable modules
 │   │   ├── shell.py
 │   │   ├── tools.py
 │   │   ├── fonts.py
 │   │   ├── dotfiles.py
 │   │   └── aliases.py
 │   ├── utils/
-│   │   ├── __init__.py
-│   │   └── ui.py          ← Rich + pyfiglet UI
-│   └── mcp/               ← MCP server (dev only)
-├── dotfiles/               ← Config files
-│   ├── .zshrc
-│   ├── .p10k.zsh
+│   │   ├── __init__.py       ← run_cmd(), paths
+│   │   ├── ui.py             ← Rich + pyfiglet UI
+│   │   └── rice_manager.py   ← RICE download/apply/delete
+│   └── mcp/                  ← MCP server (dev only)
+├── dotfiles/                 ← Config files
+│   ├── .zshrc                ← Minimal shell config
 │   ├── .nanorc
-│   ├── aliases.sh
-│   └── .termux/
-└── cache/                  ← Temporary files
+│   ├── rices/                ← RICE themes
+│   │   ├── manifest.json
+│   │   ├── term-shadow/
+│   │   ├── default/
+│   │   └── kawaii/
+│   └── active_rice.sh        ← Symlink to active RICE
+└── cache/                    ← Temporary files
 ```
+
+## Adding Custom Commands
+
+Each command is a separate file in `_lib/commands/`:
+
+```python
+# _lib/commands/mycommand.py
+from _lib.commands import Command
+
+class MyCommand(Command):
+    name = "mycommand"
+    aliases = ["mc"]
+    description = "My custom command"
+    usage = "mycommand [args]"
+    tui_label = "[9] My command"  # None = not in TUI
+    tui_position = 90
+    tui_section = "main"          # or "rice" for submenu
+
+    def execute(self, args=None):
+        from _lib.utils.ui import console, banner
+        banner()
+        console.print("Hello from my command!")
+```
+
+The command is auto-discovered and added to the TUI menu.
 
 ## Requirements
 
