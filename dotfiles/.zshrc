@@ -1,6 +1,6 @@
 # ================================================
 #  Shadow-SetUp · .zshrc
-#  Shell config con sistema modular
+#  Minimal — all theme stuff goes in active_rice.sh
 # ================================================
 
 # -----------------------------------------------
@@ -31,7 +31,7 @@ plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf python)
 source $ZSH/oh-my-zsh.sh
 
 # Powerlevel10k config
-[[ -f /data/data/com.termux/files/home/.p10k.zsh ]] && source /data/data/com.termux/files/home/.p10k.zsh
+[[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 
 # -----------------------------------------------
 # Autocompletado
@@ -48,50 +48,21 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 
 # -----------------------------------------------
-# Animación de inicio
-# -----------------------------------------------
-mensaje="Iniciando terminal..."
-color='\033[92m'
-fin_color='\033[0m'
-for ((i=0; i<${#mensaje}; i++)); do
-    echo -ne "${color}${mensaje:$i:1}${fin_color}"
-    sleep 0.15
-done
-echo
-sleep 0.5
-
-# -----------------------------------------------
 # Environment
 # -----------------------------------------------
 export RISH_APPLICATION_ID='com.termux'
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONUNBUFFERED=1
 export MANPAGER="sh -c 'col -bx | bat -l man -p'"
-export BAT_THEME="ansi"
-
-# -----------------------------------------------
-# TTS: saludo kawaii
-# -----------------------------------------------
-if command -v termux-tts-speak &>/dev/null; then
-    nohup sh -c '
-        h=$(date +%H)
-        g="Buenas noches"
-        [ "$h" -ge 6 ] && [ "$h" -lt 12 ] && g="Buenos días"
-        [ "$h" -ge 12 ] && [ "$h" -lt 19 ] && g="Buenas tardes"
-        termux-tts-speak -l es-US -r 1.1 "${g} de nuevo Onii-chan... Tu terminal está lista, ¿vamos a programar?"
-    ' &>/dev/null &!
-fi
 
 # -----------------------------------------------
 # Aliases modulares
-#  Se cargan desde ~/.shadow-setup/dotfiles/aliases.sh
 # -----------------------------------------------
 SHADOW_ALIASES="$HOME/.shadow-setup/dotfiles/aliases.sh"
 [ -f "$SHADOW_ALIASES" ] && source "$SHADOW_ALIASES"
 
 # -----------------------------------------------
-# RICE activo
-#  Se carga desde ~/.shadow-setup/active_rice.sh
+# RICE activo (animation, TTS, colors, etc.)
 # -----------------------------------------------
 SHADOW_RICE="$HOME/.shadow-setup/active_rice.sh"
 [ -f "$SHADOW_RICE" ] && source "$SHADOW_RICE"
