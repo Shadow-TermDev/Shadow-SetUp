@@ -16,7 +16,7 @@ class UpdateCommand(Command):
     tui_section = "main"
 
     def execute(self, args=None):
-        from _lib.utils.ui import console, banner, success_box, error_box
+        from _lib.utils.ui import console, success_box, error_box, info_box
         from _lib.modules.loader import load_modules
 
         if args is None:
@@ -42,14 +42,14 @@ class UpdateCommand(Command):
             except (KeyboardInterrupt, EOFError):
                 return
 
-        banner()
-
+        console.print()
         try:
             if not args:
                 # Update all
                 for name, mod in sorted(modules.items()):
                     console.print(f"\n[bold cyan]Updating {name}...[/bold cyan]")
-                    success = mod.update()
+                    with console.status(f"[bold cyan]Running {name} update...[/bold cyan]", spinner="dots"):
+                        success = mod.update()
                     if success:
                         success_box("Module", f"{name} updated")
                     else:
@@ -57,14 +57,15 @@ class UpdateCommand(Command):
             else:
                 # Update specified
                 for name in args:
-                    if name in modules:
-                        console.print(f"\n[bold cyan]Updating {name}...[/bold cyan]")
-                        success = modules[name].update()
-                        if success:
-                            success_box("Module", f"{name} updated")
-                        else:
-                            error_box("Module", f"{name} failed")
-                    else:
+                    if name not in modules:
                         error_box("Module", f"'{name}' not found")
+                        continue
+                    console.print(f"\n[bold cyan]Updating {name}...[/bold cyan]")
+                    with console.status(f"[bold cyan]Running {name} update...[/bold cyan]", spinner="dots"):
+                        success = modules[name].update()
+                    if success:
+                        success_box("Module", f"{name} updated")
+                    else:
+                        error_box("Module", f"{name} failed")
         except KeyboardInterrupt:
             console.print("\n[dim]Cancelled[/dim]")

@@ -12,8 +12,7 @@ class VersionCommand(Command):
     tui_position = 80
     tui_section = "main"
 
-    def execute(self, args: list[str] = None) -> None:
-        from _lib.utils.ui import console, banner
+    def execute(self, args=None):
+        from _lib.utils.ui import console
         from _lib import __version__
-        banner()
-        console.print(f"Shadow-SetUp v{__version__}")
+        console.print(f"[bold]Shadow-SetUp[/bold] v{__version__}")

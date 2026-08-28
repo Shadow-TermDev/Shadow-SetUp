@@ -15,7 +15,7 @@ class UninstallCommand(Command):
     tui_section = "main"
 
     def execute(self, args=None):
-        from _lib.utils.ui import console, banner, success_box, error_box
+        from _lib.utils.ui import console, success_box, error_box, info_box
         from _lib.modules.loader import load_modules
 
         if args is None:
@@ -42,14 +42,23 @@ class UninstallCommand(Command):
             error_box("Error", "Usage: uninstall <module>")
             return
 
-        banner()
+        console.print()
         for name in args:
-            if name in modules:
-                console.print(f"\n[bold cyan]Uninstalling {name}...[/bold cyan]")
-                success = modules[name].uninstall()
-                if success:
-                    success_box("Module", f"{name} uninstalled")
-                else:
-                    error_box("Module", f"{name} failed")
-            else:
+            if name not in modules:
                 error_box("Module", f"'{name}' not found")
+                continue
+
+            mod = modules[name]
+            status = mod.status()
+            is_installed = status.get("status") == "ok"
+
+            if not is_installed:
+                info_box("Module", f"{name} not installed — skipping")
+                continue
+
+            console.print(f"\n[bold cyan]Uninstalling {name}...[/bold cyan]")
+            success = mod.uninstall()
+            if success:
+                success_box("Module", f"{name} uninstalled")
+            else:
+                error_box("Module", f"{name} failed")

@@ -154,8 +154,8 @@ def main():
         console.print(f"[red]Usage: {cmd.usage}[/red]")
         sys.exit(1)
 
-    # Commands that need banner
-    NEEDS_BANNER = {"list", "install", "update", "uninstall", "status", "update-core", "rice"}
+    # Commands that need banner (clear screen)
+    NEEDS_BANNER = {"list", "install", "update", "uninstall", "status", "rice"}
     if cmd.name in NEEDS_BANNER:
         clear_screen()
 

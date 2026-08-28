@@ -12,14 +12,12 @@ class UpdateCoreCommand(Command):
     tui_position = 70
     tui_section = "main"
 
-    def execute(self, args: list[str] = None) -> None:
+    def execute(self, args=None):
         import subprocess
         import shutil
         from pathlib import Path
-        from _lib.utils.ui import banner, console, success_box, error_box
+        from _lib.utils.ui import console, success_box, error_box
         from _lib.utils import SHADOW_DATA
-
-        banner()
 
         temp_dir = SHADOW_DATA / "cache" / "shadow-update"
 
