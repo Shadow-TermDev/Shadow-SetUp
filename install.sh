@@ -93,6 +93,11 @@ if [ -d "$TEMP_DIR/dotfiles" ]; then
         [ "$item_name" = "rices" ] && continue
         cp -r "$item" "$SHADOW_DATA/dotfiles/"
     done
+    # Copy manifest.json for RICE detection
+    [ -f "$TEMP_DIR/dotfiles/rices/manifest.json" ] && {
+        mkdir -p "$SHADOW_DATA/dotfiles/rices"
+        cp "$TEMP_DIR/dotfiles/rices/manifest.json" "$SHADOW_DATA/dotfiles/rices/"
+    }
     ok "dotfiles installed"
 fi
 
