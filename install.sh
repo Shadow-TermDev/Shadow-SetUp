@@ -140,10 +140,10 @@ read -p "  Choice [1]: " choice < /dev/tty
 choice="${choice:-1}"
 
 case "$choice" in
-    1) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases ;;
-    2) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools ;;
+    1) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases < /dev/tty ;;
+    2) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools < /dev/tty ;;
     3) info "Skipping module install" ;;
-    *) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases ;;
+    *) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases < /dev/tty ;;
 esac
 
 # -----------------------------------------------
@@ -158,9 +158,10 @@ REPO_RICES="$TEMP_DIR/dotfiles/rices"
 RICE_LIST=()
 
 if [ -d "$REPO_RICES" ]; then
-    for d in "$REPO_RICES"/*; do
-        [ -d "$d" ] && [ -f "$d/rice.sh" ] && RICE_LIST+=("$(basename "$d")")
-    done
+    # Use find instead of glob for reliability
+    while IFS= read -r d; do
+        [ -f "$d/rice.sh" ] && RICE_LIST+=("$(basename "$d")")
+    done < <(find "$REPO_RICES" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort)
 fi
 
 RICE_COUNT=${#RICE_LIST[@]}
