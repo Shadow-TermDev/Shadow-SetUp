@@ -4,7 +4,8 @@
 #  Usage: curl -fsSL <url>/install.sh | bash
 # ================================================
 
-set -euo pipefail
+# NO set -e here — we handle errors manually
+set -uo pipefail
 
 # Colors
 RED='\033[0;31m'
@@ -172,9 +173,10 @@ echo "  [2] Minimal (shell + tools only)"
 echo "  [3] Custom (choose modules)"
 echo "  [4] Skip (configure later)"
 echo ""
-read -p "  Choice [1]: " choice="${choice:-1}"
+read -p "  Choice [1]: " choice
+choice="${choice:-1}"
 
-case "${choice:-1}" in
+case "$choice" in
     1)
         python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases
         ;;
@@ -184,7 +186,7 @@ case "${choice:-1}" in
     3)
         echo ""
         echo "Available modules: shell, tools, fonts, dotfiles, aliases"
-        read -p "  Modules (space-separated): " modules=""
+        read -p "  Modules (space-separated): " modules
         [ -n "$modules" ] && python3 "$SHADOW_DATA/_lib/cli.py" install $modules
         ;;
     4)
@@ -199,89 +201,89 @@ esac
 # -----------------------------------------------
 # RICE selection
 # -----------------------------------------------
-ACTIVE_RICE_LINK="$SHADOW_DATA/active_rice.sh"
-CURRENT_RICE=""
+RICES_DIR="$SHADOW_DATA/dotfiles/rices"
+RICE_OPTS=()
+RICE_NUM=0
 
-if [ -f "$ACTIVE_RICE_LINK" ]; then
-    for rice_dir in "$SHADOW_DATA/dotfiles/rices"/*/; do
+# Build list of available RICEs
+if [ -d "$RICES_DIR" ]; then
+    for rice_dir in "$RICES_DIR"*/; do
         [ -d "$rice_dir" ] || continue
         if [ -f "$rice_dir/rice.sh" ]; then
-            if diff -q "$ACTIVE_RICE_LINK" "$rice_dir/rice.sh" &>/dev/null; then
-                CURRENT_RICE=$(basename "$rice_dir")
-                break
-            fi
+            RICE_NUM=$((RICE_NUM + 1))
+            rice_name=$(basename "$rice_dir")
+            RICE_OPTS+=("$rice_name")
         fi
     done
 fi
 
 echo ""
 
-if [ -n "$CURRENT_RICE" ]; then
-    echo -e "${BOLD}Active RICE:${NC} ${CYAN}$CURRENT_RICE${NC}"
-    echo ""
-    echo "  [1] Keep current ($CURRENT_RICE)"
-    echo "  [2] Change RICE"
-    echo "  [3] Skip"
-    echo ""
-    read -p "  Choice [1]: " rice_choice=""
-    rice_choice="${rice_choice:-1}"
+if [ "$RICE_NUM" -eq 0 ]; then
+    info "No RICEs available"
+else
+    # Detect current active RICE
+    CURRENT_RICE=""
+    ACTIVE_RICE_LINK="$SHADOW_DATA/active_rice.sh"
 
-    if [ "$rice_choice" = "2" ]; then
-        echo ""
-        RICES_DIR="$SHADOW_DATA/dotfiles/rices"
-        RICE_OPTS=()
-        RICE_NUM=1
-
-        for rice_dir in "$RICES_DIR"/*/; do
-            [ -d "$rice_dir" ] || continue
-            if [ -f "$rice_dir/rice.sh" ]; then
-                rice_name=$(basename "$rice_dir")
-                echo "  [$RICE_NUM] $rice_name"
-                RICE_OPTS+=("$rice_name")
-                RICE_NUM=$((RICE_NUM + 1))
+    if [ -f "$ACTIVE_RICE_LINK" ]; then
+        for rice_name in "${RICE_OPTS[@]}"; do
+            if [ -f "$RICES_DIR/$rice_name/rice.sh" ]; then
+                if diff -q "$ACTIVE_RICE_LINK" "$RICES_DIR/$rice_name/rice.sh" >/dev/null 2>&1; then
+                    CURRENT_RICE="$rice_name"
+                    break
+                fi
             fi
         done
+    fi
 
+    if [ -n "$CURRENT_RICE" ]; then
+        echo -e "${BOLD}Active RICE:${NC} ${CYAN}$CURRENT_RICE${NC}"
         echo ""
-        read -p "  Choice [1]: " rice_choice2=""
-        rice_choice2="${rice_choice2:-1}"
+        echo "  [1] Keep current ($CURRENT_RICE)"
+        echo "  [2] Change RICE"
+        echo "  [3] Skip"
+        echo ""
+        read -p "  Choice [1]: " rice_choice
+        rice_choice="${rice_choice:-1}"
 
-        if [ "$rice_choice2" -ge 1 ] && [ "$rice_choice2" -lt "$RICE_NUM" ] 2>/dev/null; then
-            selected_rice="${RICE_OPTS[$((rice_choice2-1))]}"
+        if [ "$rice_choice" = "2" ]; then
+            echo ""
+            for i in "${!RICE_OPTS[@]}"; do
+                echo "  [$((i+1))] ${RICE_OPTS[$i]}"
+            done
+            echo ""
+            read -p "  Choice [1]: " rice_choice2
+            rice_choice2="${rice_choice2:-1}"
+
+            if [ "$rice_choice2" -ge 1 ] && [ "$rice_choice2" -le "$RICE_NUM" ] 2>/dev/null; then
+                selected_rice="${RICE_OPTS[$((rice_choice2-1))]}"
+                python3 "$SHADOW_DATA/_lib/cli.py" rice set "$selected_rice"
+            else
+                warn "Invalid choice, keeping current..."
+            fi
+        else
+            info "Keeping current RICE"
+        fi
+    else
+        echo -e "${BOLD}Select a RICE theme:${NC}"
+        echo ""
+        for i in "${!RICE_OPTS[@]}"; do
+            echo "  [$((i+1))] ${RICE_OPTS[$i]}"
+        done
+        echo "  [$((RICE_NUM+1))] Skip"
+        echo ""
+        read -p "  Choice [1]: " rice_choice
+        rice_choice="${rice_choice:-1}"
+
+        if [ "$rice_choice" = "$((RICE_NUM+1))" ]; then
+            info "No RICE selected"
+        elif [ "$rice_choice" -ge 1 ] && [ "$rice_choice" -le "$RICE_NUM" ] 2>/dev/null; then
+            selected_rice="${RICE_OPTS[$((rice_choice-1))]}"
             python3 "$SHADOW_DATA/_lib/cli.py" rice set "$selected_rice"
         else
-            warn "Invalid choice, keeping current..."
+            warn "Invalid choice, skipping..."
         fi
-    else
-        info "Keeping current RICE"
-    fi
-else
-    RICES_DIR="$SHADOW_DATA/dotfiles/rices"
-    RICE_OPTS=()
-    RICE_NUM=1
-
-    for rice_dir in "$RICES_DIR"/*/; do
-        [ -d "$rice_dir" ] || continue
-        if [ -f "$rice_dir/rice.sh" ]; then
-            rice_name=$(basename "$rice_dir")
-            echo "  [$RICE_NUM] $rice_name"
-            RICE_OPTS+=("$rice_name")
-            RICE_NUM=$((RICE_NUM + 1))
-        fi
-    done
-
-    echo "  [$RICE_NUM] Skip (no RICE)"
-    echo ""
-    read -p "  Choice [1]: " rice_choice=""
-    rice_choice="${rice_choice:-1}"
-
-    if [ "$rice_choice" = "$RICE_NUM" ]; then
-        info "No RICE selected"
-    elif [ "$rice_choice" -ge 1 ] && [ "$rice_choice" -lt "$RICE_NUM" ] 2>/dev/null; then
-        selected_rice="${RICE_OPTS[$((rice_choice-1))]}"
-        python3 "$SHADOW_DATA/_lib/cli.py" rice set "$selected_rice"
-    else
-        warn "Invalid choice, skipping..."
     fi
 fi
 

@@ -25,6 +25,12 @@ SHADOW_THEME = Theme({
 
 console = Console(theme=SHADOW_THEME)
 
+def clear_screen():
+    """Clear terminal screen completely (no residue)."""
+    # ANSI escape: clear entire screen + move cursor to 0,0
+    sys.stdout.write("\033[2J\033[3J\033[H")
+    sys.stdout.flush()
+
 def get_terminal_size() -> tuple[int, int]:
     """Get terminal columns and rows."""
     try:

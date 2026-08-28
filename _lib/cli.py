@@ -20,7 +20,8 @@ sys.path.insert(0, str(lib_dir))
 from _lib import __version__
 from _lib.utils.ui import (
     console, banner, success_box, error_box,
-    info_box, module_table, status_table, interactive_menu
+    info_box, module_table, status_table, interactive_menu,
+    clear_screen
 )
 from _lib.utils import SHADOW_DATA, ensure_dirs
 from _lib.modules.loader import load_modules
@@ -270,7 +271,7 @@ def run_interactive():
                 console.print("[dim]Bye![/dim]")
                 break
 
-            console.clear()
+            clear_screen()
 
             if action == "install":
                 choices = sorted(MODULES.keys()) + ["[cancel]"]
@@ -397,7 +398,7 @@ def main():
     NEEDS_BANNER = {"list", "install", "update", "uninstall", "status", "update-core", "rice"}
 
     if command in NEEDS_BANNER:
-        console.clear()
+        clear_screen()
 
     try:
         if command in ("help", "--help", "-h"):
