@@ -28,7 +28,7 @@ trap 'echo -e "\n${YELLOW}[!!]${NC} Cancelled"; exit 1' INT
 clear
 echo -e "${CYAN}${BOLD}"
 echo "  ╔═══════════════════════════════════════╗"
-echo "  ║       Shadow-SetUp                    ║"
+echo "  ║             Shadow-SetUp              ║"
 echo "  ╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "  ${BOLD}Modular Termux Environment Manager${NC}"
