@@ -4,7 +4,6 @@
 #  Usage: curl -fsSL <url>/install.sh | bash
 # ================================================
 
-# NO set -e here — we handle errors manually
 set -uo pipefail
 
 # Colors
@@ -21,7 +20,6 @@ info() { echo -e "${CYAN}[>>]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!!]${NC} $1"; }
 fail() { echo -e "${RED}[XX]${NC} $1"; exit 1; }
 
-# Trap Ctrl+C
 trap 'echo -e "\n${YELLOW}[!!]${NC} Cancelled"; exit 1' INT
 
 # -----------------------------------------------
@@ -30,7 +28,7 @@ trap 'echo -e "\n${YELLOW}[!!]${NC} Cancelled"; exit 1' INT
 clear
 echo -e "${CYAN}${BOLD}"
 echo "  ╔═══════════════════════════════════════╗"
-echo "  ║             Shadow-SetUp              ║"
+echo "  ║       Shadow-SetUp                    ║"
 echo "  ╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "  ${BOLD}Modular Termux Environment Manager${NC}"
@@ -44,64 +42,39 @@ SHADOW_DATA="$HOME/.shadow-setup"
 SHADOW_BIN="$HOME/.local/bin"
 
 # -----------------------------------------------
-# Check dependencies
+# Dependencies
 # -----------------------------------------------
 info "Checking dependencies..."
 
-if ! command -v python3 &>/dev/null; then
-    warn "Python3 not found. Installing..."
-    pkg install -y python &>/dev/null || fail "Failed to install Python"
-fi
-
-if ! command -v git &>/dev/null; then
-    warn "Git not found. Installing..."
-    pkg install -y git &>/dev/null || fail "Failed to install Git"
-fi
-
-if ! command -v curl &>/dev/null; then
-    warn "curl not found. Installing..."
-    pkg install -y curl &>/dev/null || fail "Failed to install curl"
-fi
+command -v python3 &>/dev/null || { warn "Installing python..."; pkg install -y python &>/dev/null || fail "Python install failed"; }
+command -v git &>/dev/null || { warn "Installing git..."; pkg install -y git &>/dev/null || fail "Git install failed"; }
+command -v curl &>/dev/null || { warn "Installing curl..."; pkg install -y curl &>/dev/null || fail "curl install failed"; }
 
 ok "Dependencies ready"
 
 # -----------------------------------------------
-# Install Python packages
+# Python packages
 # -----------------------------------------------
 info "Installing Python packages..."
-
-pip install --user rich colorama InquirerPy pyfiglet &>/dev/null || {
-    warn "pip install failed, trying with pkg..."
-    pkg install -y python-rich python-colorama &>/dev/null || warn "Some packages may not be available"
-}
-
+pip install --user rich colorama InquirerPy pyfiglet &>/dev/null || warn "pip install partial fail"
 ok "Python packages installed"
 
 # -----------------------------------------------
-# Create directories
+# Directories
 # -----------------------------------------------
 info "Setting up directories..."
-
-mkdir -p "$SHADOW_DATA"
-mkdir -p "$SHADOW_DATA/cache"
-mkdir -p "$SHADOW_DATA/backups"
-mkdir -p "$SHADOW_BIN"
-
+mkdir -p "$SHADOW_DATA" "$SHADOW_DATA/cache" "$SHADOW_DATA/backups" "$SHADOW_BIN"
 ok "Directories ready"
 
 # -----------------------------------------------
 # Clone repo
 # -----------------------------------------------
 TEMP_DIR="$SHADOW_DATA/cache/shadow-install"
-
-if [ -d "$TEMP_DIR" ]; then
-    rm -rf "$TEMP_DIR"
-fi
+rm -rf "$TEMP_DIR"
 
 info "Downloading Shadow-SetUp..."
 git clone --depth=1 https://github.com/Shadow-TermDev/Shadow-SetUp.git "$TEMP_DIR" &>/dev/null \
     || fail "Failed to download repository"
-
 ok "Repository downloaded"
 
 # -----------------------------------------------
@@ -109,28 +82,14 @@ ok "Repository downloaded"
 # -----------------------------------------------
 info "Installing files..."
 
-if [ -d "$TEMP_DIR/_lib" ]; then
-    rm -rf "$SHADOW_DATA/_lib"
-    cp -r "$TEMP_DIR/_lib" "$SHADOW_DATA/_lib"
-    ok "_lib installed"
-fi
-
-if [ -d "$TEMP_DIR/dotfiles" ]; then
-    rm -rf "$SHADOW_DATA/dotfiles"
-    cp -r "$TEMP_DIR/dotfiles" "$SHADOW_DATA/dotfiles"
-    ok "dotfiles installed"
-fi
-
-if [ -f "$TEMP_DIR/.version" ]; then
-    cp "$TEMP_DIR/.version" "$SHADOW_DATA/.version"
-    ok ".version installed"
-fi
+[ -d "$TEMP_DIR/_lib" ] && { rm -rf "$SHADOW_DATA/_lib"; cp -r "$TEMP_DIR/_lib" "$SHADOW_DATA/_lib"; ok "_lib installed"; }
+[ -d "$TEMP_DIR/dotfiles" ] && { rm -rf "$SHADOW_DATA/dotfiles"; cp -r "$TEMP_DIR/dotfiles" "$SHADOW_DATA/dotfiles"; ok "dotfiles installed"; }
+[ -f "$TEMP_DIR/.version" ] && { cp "$TEMP_DIR/.version" "$SHADOW_DATA/.version"; ok ".version installed"; }
 
 # -----------------------------------------------
-# Create CLI wrappers
+# CLI wrappers
 # -----------------------------------------------
 info "Creating CLI commands..."
-
 for cmd in sw shadow; do
     cat > "$SHADOW_BIN/$cmd" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
@@ -141,24 +100,22 @@ EOF
 done
 
 # -----------------------------------------------
-# PATH setup
+# PATH
 # -----------------------------------------------
 info "Setting up PATH..."
-
 SHELL_RC="$HOME/.zshrc"
 [ ! -f "$SHELL_RC" ] && SHELL_RC="$HOME/.bashrc"
-
 if ! grep -q '\.local/bin' "$SHELL_RC" 2>/dev/null; then
     echo '' >> "$SHELL_RC"
     echo '# Shadow-SetUp PATH' >> "$SHELL_RC"
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_RC"
-    ok "PATH added to $(basename $SHELL_RC)"
+    ok "PATH added"
 else
-    warn "~/.local/bin already in PATH"
+    ok "PATH already configured"
 fi
 
 # -----------------------------------------------
-# Clean up
+# Clean up temp
 # -----------------------------------------------
 rm -rf "$TEMP_DIR"
 
@@ -170,120 +127,57 @@ echo -e "${BOLD}What would you like to install?${NC}"
 echo ""
 echo "  [1] Full setup (all modules)"
 echo "  [2] Minimal (shell + tools only)"
-echo "  [3] Custom (choose modules)"
-echo "  [4] Skip (configure later)"
+echo "  [3] Skip (configure later)"
 echo ""
 read -p "  Choice [1]: " choice
 choice="${choice:-1}"
 
 case "$choice" in
-    1)
-        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases
-        ;;
-    2)
-        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools
-        ;;
-    3)
-        echo ""
-        echo "Available modules: shell, tools, fonts, dotfiles, aliases"
-        read -p "  Modules (space-separated): " modules
-        [ -n "$modules" ] && python3 "$SHADOW_DATA/_lib/cli.py" install $modules
-        ;;
-    4)
-        info "Skipping setup. Run 'sw install <module>' later."
-        ;;
-    *)
-        warn "Invalid choice, running full setup..."
-        python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases
-        ;;
+    1) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases ;;
+    2) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools ;;
+    3) info "Skipping module install" ;;
+    *) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases ;;
 esac
 
 # -----------------------------------------------
-# RICE selection
+# RICE selection — ALWAYS SHOW IF RICES EXIST
 # -----------------------------------------------
-RICES_DIR="$SHADOW_DATA/dotfiles/rices"
-RICE_OPTS=()
-RICE_NUM=0
+echo ""
+echo -e "${BOLD}--- RICE Selection ---${NC}"
+echo ""
 
-# Build list of available RICEs
+RICES_DIR="$SHADOW_DATA/dotfiles/rices"
+RICE_LIST=()
+
+# Scan for available RICEs
 if [ -d "$RICES_DIR" ]; then
-    for rice_dir in "$RICES_DIR"*/; do
-        [ -d "$rice_dir" ] || continue
-        if [ -f "$rice_dir/rice.sh" ]; then
-            RICE_NUM=$((RICE_NUM + 1))
-            rice_name=$(basename "$rice_dir")
-            RICE_OPTS+=("$rice_name")
-        fi
+    for d in "$RICES_DIR"/*; do
+        [ -d "$d" ] && [ -f "$d/rice.sh" ] && RICE_LIST+=("$(basename "$d")")
     done
 fi
 
-echo ""
+RICE_COUNT=${#RICE_LIST[@]}
 
-if [ "$RICE_NUM" -eq 0 ]; then
-    info "No RICEs available"
+if [ "$RICE_COUNT" -eq 0 ]; then
+    info "No RICEs found. Run 'sw rice install <url>' later."
 else
-    # Detect current active RICE
-    CURRENT_RICE=""
-    ACTIVE_RICE_LINK="$SHADOW_DATA/active_rice.sh"
+    # Show menu
+    for i in "${!RICE_LIST[@]}"; do
+        echo "  [$((i+1))] ${RICE_LIST[$i]}"
+    done
+    echo "  [s] Skip"
+    echo ""
+    read -p "  Choice [1]: " rice_input
+    rice_input="${rice_input:-1}"
 
-    if [ -f "$ACTIVE_RICE_LINK" ]; then
-        for rice_name in "${RICE_OPTS[@]}"; do
-            if [ -f "$RICES_DIR/$rice_name/rice.sh" ]; then
-                if diff -q "$ACTIVE_RICE_LINK" "$RICES_DIR/$rice_name/rice.sh" >/dev/null 2>&1; then
-                    CURRENT_RICE="$rice_name"
-                    break
-                fi
-            fi
-        done
-    fi
-
-    if [ -n "$CURRENT_RICE" ]; then
-        echo -e "${BOLD}Active RICE:${NC} ${CYAN}$CURRENT_RICE${NC}"
-        echo ""
-        echo "  [1] Keep current ($CURRENT_RICE)"
-        echo "  [2] Change RICE"
-        echo "  [3] Skip"
-        echo ""
-        read -p "  Choice [1]: " rice_choice
-        rice_choice="${rice_choice:-1}"
-
-        if [ "$rice_choice" = "2" ]; then
-            echo ""
-            for i in "${!RICE_OPTS[@]}"; do
-                echo "  [$((i+1))] ${RICE_OPTS[$i]}"
-            done
-            echo ""
-            read -p "  Choice [1]: " rice_choice2
-            rice_choice2="${rice_choice2:-1}"
-
-            if [ "$rice_choice2" -ge 1 ] && [ "$rice_choice2" -le "$RICE_NUM" ] 2>/dev/null; then
-                selected_rice="${RICE_OPTS[$((rice_choice2-1))]}"
-                python3 "$SHADOW_DATA/_lib/cli.py" rice set "$selected_rice"
-            else
-                warn "Invalid choice, keeping current..."
-            fi
-        else
-            info "Keeping current RICE"
-        fi
+    if [ "$rice_input" = "s" ] || [ "$rice_input" = "S" ]; then
+        info "No RICE selected"
+    elif [ "$rice_input" -ge 1 ] && [ "$rice_input" -le "$RICE_COUNT" ] 2>/dev/null; then
+        PICKED="${RICE_LIST[$((rice_input-1))]}"
+        info "Activating '$PICKED'..."
+        python3 "$SHADOW_DATA/_lib/cli.py" rice set "$PICKED"
     else
-        echo -e "${BOLD}Select a RICE theme:${NC}"
-        echo ""
-        for i in "${!RICE_OPTS[@]}"; do
-            echo "  [$((i+1))] ${RICE_OPTS[$i]}"
-        done
-        echo "  [$((RICE_NUM+1))] Skip"
-        echo ""
-        read -p "  Choice [1]: " rice_choice
-        rice_choice="${rice_choice:-1}"
-
-        if [ "$rice_choice" = "$((RICE_NUM+1))" ]; then
-            info "No RICE selected"
-        elif [ "$rice_choice" -ge 1 ] && [ "$rice_choice" -le "$RICE_NUM" ] 2>/dev/null; then
-            selected_rice="${RICE_OPTS[$((rice_choice-1))]}"
-            python3 "$SHADOW_DATA/_lib/cli.py" rice set "$selected_rice"
-        else
-            warn "Invalid choice, skipping..."
-        fi
+        warn "Invalid choice, skipping..."
     fi
 fi
 
