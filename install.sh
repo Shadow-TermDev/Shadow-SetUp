@@ -162,13 +162,15 @@ install_default_if_needed() {
         done
     fi
     
-    if [ "$HAS_RICES" = false ] && [ -d "$REPO_RICES/default" ]; then
-        mkdir -p "$SHADOW_DATA/dotfiles/rices"
-        cp -r "$REPO_RICES/default" "$SHADOW_DATA/dotfiles/rices/"
-        info "Installing default RICE..."
-        python3 "$SHADOW_DATA/_lib/cli.py" rice set default < /dev/tty
+    if [ "$HAS_RICES" = false ]; then
+        if [ -d "$REPO_RICES/default" ]; then
+            mkdir -p "$SHADOW_DATA/dotfiles/rices"
+            cp -r "$REPO_RICES/default" "$SHADOW_DATA/dotfiles/rices/"
+            info "No RICEs found — installing default..."
+            python3 "$SHADOW_DATA/_lib/cli.py" rice set default < /dev/tty
+        fi
     else
-        info "Keeping current setup"
+        info "RICEs exist — keeping current setup"
     fi
 }
 
