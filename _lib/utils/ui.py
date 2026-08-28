@@ -190,18 +190,17 @@ def status_table(status_data: dict):
 def interactive_menu():
     """Interactive TUI menu with arrow key navigation."""
     from InquirerPy import inquirer
+    from _lib.commands import get_tui_commands, load_commands
 
-    choices = [
-        {"name": "[1] Install module", "value": "install"},
-        {"name": "[2] Update modules", "value": "update"},
-        {"name": "[3] Uninstall module", "value": "uninstall"},
-        {"name": "[4] List modules", "value": "list"},
-        {"name": "[5] System status", "value": "status"},
-        {"name": "[6] Manage RICEs", "value": "rice"},
-        {"name": "[7] Update framework", "value": "update-core"},
-        {"name": "[8] Version info", "value": "version"},
-        {"name": "[x] Exit", "value": "exit"},
-    ]
+    # Ensure commands are loaded
+    load_commands()
+    tui_cmds = get_tui_commands()
+
+    # Build choices from registered commands
+    choices = []
+    for cmd in sorted(tui_cmds, key=lambda c: c.tui_position or 999):
+        choices.append({"name": cmd.tui_label, "value": cmd.name})
+    choices.append({"name": "[x] Exit", "value": "exit"})
 
     console.clear()
     banner()
@@ -210,7 +209,7 @@ def interactive_menu():
         action = inquirer.select(
             message="What do you want to do?",
             choices=choices,
-            default="install",
+            default=choices[0]["value"] if choices else None,
         ).execute()
     except KeyboardInterrupt:
         return "exit"

@@ -1,87 +1,111 @@
-"""Command registry — dynamic command loading."""
+"""Command system — dynamic command loading and registry."""
 
+import pkgutil
 import importlib
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 @dataclass
 class Command:
-    name: str
-    description: str
-    usage: str
-    examples: list[str]
-    module: str  # module path to import
+    """Command metadata for dispatch, help, and TUI generation."""
+    name: str                                    # Primary name (e.g., "version")
+    aliases: list[str] = field(default_factory=list)  # Alt names (e.g., ["v"])
+    description: str = ""                        # What it does
+    usage: str = ""                              # Usage string
+    examples: list[str] = field(default_factory=list)  # Example usage
+    tui_label: str | None = None                 # Label in TUI (None = not in TUI)
+    tui_position: int | None = None              # Position in TUI menu
+    tui_section: str | None = None               # "main" or "rice" submenu
+    needs_args: bool = False                     # Requires arguments?
+    has_submenu: bool = False                    # Has submenu in TUI?
+    handler: str = ""                            # Module path to import
+    handler_func: str = ""                       # Function name to call (empty = use name)
 
-COMMANDS: list[Command] = [
-    Command(
-        name="install",
-        description="Install a module",
-        usage="install <module>",
-        examples=[
-            "install shell          # Install zsh + plugins",
-            "install shell tools    # Install multiple modules",
-        ],
-        module="install",
-    ),
-    Command(
-        name="update",
-        description="Update module(s)",
-        usage="update [module]",
-        examples=[
-            "update                 # Update all modules",
-            "update shell           # Update only shell",
-        ],
-        module="update",
-    ),
-    Command(
-        name="uninstall",
-        description="Uninstall a module",
-        usage="uninstall <module>",
-        examples=[
-            "uninstall shell        # Remove shell config",
-        ],
-        module="uninstall",
-    ),
-    Command(
-        name="list",
-        description="List available modules",
-        usage="list",
-        examples=[],
-        module="list",
-    ),
-    Command(
-        name="status",
-        description="Show module status",
-        usage="status [module]",
-        examples=[
-            "status                 # Show all status",
-            "status shell           # Show shell status",
-        ],
-        module="status",
-    ),
-    Command(
-        name="update-core",
-        description="Update framework from GitHub",
-        usage="update-core",
-        examples=[],
-        module="update_core",
-    ),
-    Command(
-        name="version",
-        description="Show version info",
-        usage="version",
-        examples=[],
-        module="version",
-    ),
-]
+    def matches(self, arg: str) -> bool:
+        """Check if a CLI argument matches this command."""
+        return arg == self.name or arg in self.aliases
 
-def get_command(name: str) -> Command | None:
-    """Get a command by name."""
+    def execute(self, args: list[str] = None) -> None:
+        """Execute the command (override in subclass)."""
+        pass
+
+# Command registry — populated by load_commands()
+COMMANDS: list[Command] = []
+
+_COMMANDS_DIR = Path(__file__).parent
+
+def _make_command(cls) -> Command:
+    """Create a Command instance from a class with class-level attributes."""
+    cmd = Command.__new__(Command)
+    cmd.name = getattr(cls, 'name', '')
+    cmd.aliases = getattr(cls, 'aliases', [])
+    cmd.description = getattr(cls, 'description', '')
+    cmd.usage = getattr(cls, 'usage', '')
+    cmd.examples = getattr(cls, 'examples', [])
+    cmd.tui_label = getattr(cls, 'tui_label', None)
+    cmd.tui_position = getattr(cls, 'tui_position', None)
+    cmd.tui_section = getattr(cls, 'tui_section', None)
+    cmd.needs_args = getattr(cls, 'needs_args', False)
+    cmd.has_submenu = getattr(cls, 'has_submenu', False)
+    cmd.handler = getattr(cls, 'handler', '')
+    cmd.handler_func = getattr(cls, 'handler_func', '')
+    # Bind execute from the subclass
+    if hasattr(cls, 'execute') and callable(getattr(cls, 'execute')):
+        import types
+        cmd.execute = types.MethodType(cls.execute, cmd)
+    return cmd
+
+def load_commands() -> list[Command]:
+    """Auto-discover and instantiate all Command subclasses in _lib/commands/."""
+    global COMMANDS
+    commands = []
+
+    for importer, modname, ispkg in pkgutil.iter_modules([str(_COMMANDS_DIR)]):
+        if modname.startswith("_") or modname == "base":
+            continue
+
+        try:
+            full_name = f"_lib.commands.{modname}"
+            mod = importlib.import_module(full_name)
+
+            # Find the class that inherits from Command
+            for attr_name in dir(mod):
+                attr = getattr(mod, attr_name)
+                if (
+                    isinstance(attr, type)
+                    and issubclass(attr, Command)
+                    and attr is not Command
+                    and hasattr(attr, "name")
+                ):
+                    cmd = _make_command(attr)
+                    commands.append(cmd)
+                    break
+
+        except Exception as e:
+            # Skip commands that fail to load
+            pass
+
+    # Sort by tui_position
+    commands.sort(key=lambda c: c.tui_position or 999)
+    COMMANDS = commands
+    return commands
+
+def get_command(arg: str) -> Command | None:
+    """Get a command by name or alias."""
     for cmd in COMMANDS:
-        if cmd.name == name:
+        if cmd.matches(arg):
             return cmd
     return None
 
 def get_all_commands() -> list[Command]:
     """Get all registered commands."""
     return COMMANDS
+
+def get_tui_commands() -> list[Command]:
+    """Get commands that appear in the TUI main menu."""
+    return [c for c in COMMANDS if c.tui_label and c.tui_section == "main"]
+
+def get_rice_commands() -> list[Command]:
+    """Get commands that appear in the RICE submenu."""
+    return [c for c in COMMANDS if c.tui_label and c.tui_section == "rice"]
