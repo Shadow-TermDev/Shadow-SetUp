@@ -78,12 +78,24 @@ git clone --depth=1 https://github.com/Shadow-TermDev/Shadow-SetUp.git "$TEMP_DI
 ok "Repository downloaded"
 
 # -----------------------------------------------
-# Install files
+# Install files (EXCEPT rices — handled later)
 # -----------------------------------------------
 info "Installing files..."
 
 [ -d "$TEMP_DIR/_lib" ] && { rm -rf "$SHADOW_DATA/_lib"; cp -r "$TEMP_DIR/_lib" "$SHADOW_DATA/_lib"; ok "_lib installed"; }
-[ -d "$TEMP_DIR/dotfiles" ] && { rm -rf "$SHADOW_DATA/dotfiles"; cp -r "$TEMP_DIR/dotfiles" "$SHADOW_DATA/dotfiles"; ok "dotfiles installed"; }
+
+if [ -d "$TEMP_DIR/dotfiles" ]; then
+    rm -rf "$SHADOW_DATA/dotfiles"
+    mkdir -p "$SHADOW_DATA/dotfiles"
+    # Copy everything EXCEPT rices directory
+    for item in "$TEMP_DIR/dotfiles"/*; do
+        item_name=$(basename "$item")
+        [ "$item_name" = "rices" ] && continue
+        cp -r "$item" "$SHADOW_DATA/dotfiles/"
+    done
+    ok "dotfiles installed"
+fi
+
 [ -f "$TEMP_DIR/.version" ] && { cp "$TEMP_DIR/.version" "$SHADOW_DATA/.version"; ok ".version installed"; }
 
 # -----------------------------------------------
@@ -140,18 +152,18 @@ case "$choice" in
 esac
 
 # -----------------------------------------------
-# RICE selection — ALWAYS SHOW IF RICES EXIST
+# RICE selection — ONLY COPY SELECTED ONE
 # -----------------------------------------------
 echo ""
 echo -e "${BOLD}--- RICE Selection ---${NC}"
 echo ""
 
-RICES_DIR="$SHADOW_DATA/dotfiles/rices"
+# RICEs from downloaded repo
+REPO_RICES="$TEMP_DIR/dotfiles/rices"
 RICE_LIST=()
 
-# Scan for available RICEs
-if [ -d "$RICES_DIR" ]; then
-    for d in "$RICES_DIR"/*; do
+if [ -d "$REPO_RICES" ]; then
+    for d in "$REPO_RICES"/*; do
         [ -d "$d" ] && [ -f "$d/rice.sh" ] && RICE_LIST+=("$(basename "$d")")
     done
 fi
@@ -159,9 +171,8 @@ fi
 RICE_COUNT=${#RICE_LIST[@]}
 
 if [ "$RICE_COUNT" -eq 0 ]; then
-    info "No RICEs found. Run 'sw rice install <url>' later."
+    info "No RICEs available"
 else
-    # Show menu
     for i in "${!RICE_LIST[@]}"; do
         echo "  [$((i+1))] ${RICE_LIST[$i]}"
     done
@@ -174,7 +185,10 @@ else
         info "No RICE selected"
     elif [ "$rice_input" -ge 1 ] && [ "$rice_input" -le "$RICE_COUNT" ] 2>/dev/null; then
         PICKED="${RICE_LIST[$((rice_input-1))]}"
-        info "Activating '$PICKED'..."
+        # Copy ONLY this RICE
+        mkdir -p "$SHADOW_DATA/dotfiles/rices"
+        cp -r "$REPO_RICES/$PICKED" "$SHADOW_DATA/dotfiles/rices/"
+        info "Installing '$PICKED'..."
         python3 "$SHADOW_DATA/_lib/cli.py" rice set "$PICKED" < /dev/tty
     else
         warn "Invalid choice, skipping..."
