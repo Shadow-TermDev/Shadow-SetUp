@@ -98,23 +98,29 @@ def get_active_rice() -> str | None:
     return None
 
 def download_rice(rice_name: str, rice_info: dict) -> bool:
-    """Download a RICE from GitHub (or skip if local)."""
+    """Download a RICE from GitHub (or copy if local)."""
     ensure_dirs()
 
     rice_dir = RICES_DIR / rice_name
     if rice_dir.exists() and (rice_dir / "rice.sh").exists():
         return True  # Already downloaded
 
-    # Local RICEs are bundled with Shadow-SetUp
+    # Local RICEs — copy from project's dotfiles/rices/
     if rice_info.get("local"):
-        # Check if it exists in the repo's dotfiles/rices/
-        repo_rice = Path(__file__).parent.parent.parent / "dotfiles" / "rices" / rice_name
-        if repo_rice.exists() and (repo_rice / "rice.sh").exists():
-            shutil.copytree(repo_rice, rice_dir)
-            return True
-        error_box("Rice", f"Local RICE '{rice_name}' not found in repo")
+        # Try multiple possible locations
+        possible_paths = [
+            Path(__file__).parent.parent.parent / "dotfiles" / "rices" / rice_name,
+            Path.home() / "Shadow-SetUp" / "dotfiles" / "rices" / rice_name,
+            Path.home() / ".shadow-setup" / "dotfiles" / "rices" / rice_name,
+        ]
+        for repo_rice in possible_paths:
+            if repo_rice.exists() and (repo_rice / "rice.sh").exists():
+                shutil.copytree(repo_rice, rice_dir)
+                return True
+        error_box("Rice", f"Local RICE '{rice_name}' not found")
         return False
 
+    # Remote RICEs — clone from git
     url = rice_info.get("url", RICES_REPO_BASE)
     path = rice_info.get("path", rice_name)
 

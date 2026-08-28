@@ -183,14 +183,15 @@ else
     rice_input="${rice_input:-1}"
 
     if [ "$rice_input" = "s" ] || [ "$rice_input" = "S" ]; then
-        # Install default RICE to prevent zshrc issues
-        if [ -d "$REPO_RICES/default" ]; then
+        # Only install default if no active RICE exists
+        ACTIVE_LINK="$SHADOW_DATA/active_rice.sh"
+        if [ ! -f "$ACTIVE_LINK" ] && [ -d "$REPO_RICES/default" ]; then
             mkdir -p "$SHADOW_DATA/dotfiles/rices"
             cp -r "$REPO_RICES/default" "$SHADOW_DATA/dotfiles/rices/"
-            info "Installing default RICE (required for zsh)..."
+            info "Installing default RICE (required)..."
             python3 "$SHADOW_DATA/_lib/cli.py" rice set default < /dev/tty
         else
-            info "No RICE selected"
+            info "Keeping current RICE"
         fi
     elif [ "$rice_input" -ge 1 ] && [ "$rice_input" -le "$RICE_COUNT" ] 2>/dev/null; then
         PICKED="${RICE_LIST[$((rice_input-1))]}"
