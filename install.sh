@@ -26,7 +26,7 @@ fail() { echo -e "${RED}[XX]${NC} $1"; exit 1; }
 clear
 echo -e "${CYAN}${BOLD}"
 echo "  ╔═══════════════════════════════════════╗"
-echo "  ║       Shadow-SetUp v2.3.0             ║"
+echo "  ║           Shadow-SetUp v2             ║"
 echo "  ╚═══════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "  ${BOLD}Modular Termux Environment Manager${NC}"
