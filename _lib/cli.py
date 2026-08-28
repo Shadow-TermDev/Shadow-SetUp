@@ -159,13 +159,16 @@ def update_core():
                     shutil.rmtree(lib_dst)
                 shutil.copytree(lib_src, lib_dst)
 
-            # Copy dotfiles
+            # Copy dotfiles (only essential files, NOT rices)
             dotfiles_src = temp_dir / "dotfiles"
             dotfiles_dst = SHADOW_DATA / "dotfiles"
             if dotfiles_src.exists():
-                if dotfiles_dst.exists():
-                    shutil.rmtree(dotfiles_dst)
-                shutil.copytree(dotfiles_src, dotfiles_dst)
+                dotfiles_dst.mkdir(parents=True, exist_ok=True)
+                # Only copy essential dotfiles
+                for fname in [".zshrc", ".nanorc", "aliases.sh", "functions.sh"]:
+                    src_f = dotfiles_src / fname
+                    if src_f.exists():
+                        shutil.copy2(src_f, dotfiles_dst / fname)
 
             # Copy .version
             version_src = temp_dir / ".version"
