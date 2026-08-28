@@ -190,6 +190,18 @@ def apply_rice_files(rice_name: str) -> bool:
         if p10k.exists():
             shutil.copy2(p10k, Path.home() / ".p10k.zsh")
 
+        # Copy RICE-specific aliases (will override default aliases)
+        aliases = rice_dir / "aliases.sh"
+        if aliases.exists():
+            dest = SHADOW_DATA / "aliases.sh"
+            shutil.copy2(aliases, dest)
+
+        # Copy RICE-specific functions
+        functions = rice_dir / "functions.sh"
+        if functions.exists():
+            dest = SHADOW_DATA / "functions.sh"
+            shutil.copy2(functions, dest)
+
         # Copy Termux config files
         termux_dir = Path.home() / ".termux"
         termux_dir.mkdir(parents=True, exist_ok=True)

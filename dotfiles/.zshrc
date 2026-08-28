@@ -1,6 +1,6 @@
 # ================================================
 #  Shadow-SetUp · .zshrc
-#  Minimal — all theme stuff goes in active_rice.sh
+#  Minimal — RICE handles everything
 # ================================================
 
 # -----------------------------------------------
@@ -56,18 +56,6 @@ export PYTHONUNBUFFERED=1
 export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 
 # -----------------------------------------------
-# Aliases modulares
-# -----------------------------------------------
-SHADOW_ALIASES="$HOME/.shadow-setup/dotfiles/aliases.sh"
-[ -f "$SHADOW_ALIASES" ] && source "$SHADOW_ALIASES"
-
-# -----------------------------------------------
-# RICE activo (animation, TTS, colors, etc.)
-# -----------------------------------------------
-SHADOW_RICE="$HOME/.shadow-setup/active_rice.sh"
-[ -f "$SHADOW_RICE" ] && source "$SHADOW_RICE"
-
-# -----------------------------------------------
 # Hardware/Seguridad
 # -----------------------------------------------
 umask 077
@@ -90,3 +78,17 @@ if command -v fzf &>/dev/null; then
         export FZF_DEFAULT_OPTS='--height 50% --layout=reverse --border --preview "head -100 {} 2>/dev/null"'
     fi
 fi
+
+# -----------------------------------------------
+# RICE activo (aliases, functions, animation, TTS)
+# -----------------------------------------------
+SHADOW_RICE="$HOME/.shadow-setup/active_rice.sh"
+[ -f "$SHADOW_RICE" ] && source "$SHADOW_RICE"
+
+# RICE aliases (overrides default if present)
+SHADOW_ALIASES="$HOME/.shadow-setup/aliases.sh"
+[ -f "$SHADOW_ALIASES" ] && source "$SHADOW_ALIASES"
+
+# RICE functions
+SHADOW_FUNCTIONS="$HOME/.shadow-setup/functions.sh"
+[ -f "$SHADOW_FUNCTIONS" ] && source "$SHADOW_FUNCTIONS"

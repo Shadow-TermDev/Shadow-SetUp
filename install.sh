@@ -200,7 +200,7 @@ else
         else
             info "Keeping current setup"
         fi
-    elif [ "$rice_input" -ge 1 ] && [ "$rice_input" -le "$RICE_COUNT" ] 2>/dev/null; then
+    elif [[ "$rice_input" =~ ^[0-9]+$ ]] && [ "$rice_input" -ge 1 ] && [ "$rice_input" -le "$RICE_COUNT" ]; then
         PICKED="${RICE_LIST[$((rice_input-1))]}"
         # Copy ONLY this RICE
         mkdir -p "$SHADOW_DATA/dotfiles/rices"
@@ -208,7 +208,12 @@ else
         info "Installing '$PICKED'..."
         python3 "$SHADOW_DATA/_lib/cli.py" rice set "$PICKED" < /dev/tty
     else
-        warn "Invalid choice, skipping..."
+        warn "Invalid choice, installing default..."
+        if [ -d "$REPO_RICES/default" ]; then
+            mkdir -p "$SHADOW_DATA/dotfiles/rices"
+            cp -r "$REPO_RICES/default" "$SHADOW_DATA/dotfiles/rices/"
+            python3 "$SHADOW_DATA/_lib/cli.py" rice set default < /dev/tty
+        fi
     fi
 fi
 
