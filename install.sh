@@ -85,6 +85,14 @@ info "Installing files..."
 [ -d "$TEMP_DIR/_lib" ] && { rm -rf "$SHADOW_DATA/_lib"; cp -r "$TEMP_DIR/_lib" "$SHADOW_DATA/_lib"; ok "_lib installed"; }
 
 if [ -d "$TEMP_DIR/dotfiles" ]; then
+    # Preserve existing rices before overwriting
+    EXISTING_RICES=""
+    if [ -d "$SHADOW_DATA/dotfiles/rices" ]; then
+        EXISTING_RICES="$SHADOW_DATA/cache/existing_rices_backup"
+        rm -rf "$EXISTING_RICES"
+        cp -r "$SHADOW_DATA/dotfiles/rices" "$EXISTING_RICES"
+    fi
+    
     rm -rf "$SHADOW_DATA/dotfiles"
     mkdir -p "$SHADOW_DATA/dotfiles"
     # Copy everything EXCEPT rices directory
@@ -93,6 +101,16 @@ if [ -d "$TEMP_DIR/dotfiles" ]; then
         [ "$item_name" = "rices" ] && continue
         cp -r "$item" "$SHADOW_DATA/dotfiles/"
     done
+    # Restore existing rices (if any)
+    if [ -n "$EXISTING_RICES" ] && [ -d "$EXISTING_RICES" ]; then
+        mkdir -p "$SHADOW_DATA/dotfiles/rices"
+        for item in "$EXISTING_RICES"/*; do
+            item_name=$(basename "$item")
+            [ "$item_name" = "manifest.json" ] && continue
+            cp -r "$item" "$SHADOW_DATA/dotfiles/rices/"
+        done
+        rm -rf "$EXISTING_RICES"
+    fi
     # Copy manifest.json for RICE detection
     [ -f "$TEMP_DIR/dotfiles/rices/manifest.json" ] && {
         mkdir -p "$SHADOW_DATA/dotfiles/rices"

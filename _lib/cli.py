@@ -52,6 +52,7 @@ def show_help():
     console.print("  [cyan]rice list[reset]      List available RICEs")
     console.print("  [cyan]rice set[reset]       Set active RICE")
     console.print("  [cyan]rice install[reset]   Install RICE from git")
+    console.print("  [cyan]rice check[reset]     Show active RICE")
     console.print()
     console.print("[bold]Examples:[/bold]")
     console.print("  sw                     # Interactive menu")
@@ -247,6 +248,29 @@ def rice_backup(rice_name: str):
     banner()
     backup_current_rice(rice_name)
 
+def rice_check():
+    """Show active RICE and installed RICEs."""
+    from _lib.utils.rice_manager import get_active_rice, list_local_rices
+    
+    banner()
+    active = get_active_rice()
+    local = list_local_rices()
+    
+    if active:
+        success_box("Active RICE", active)
+    else:
+        error_box("Active RICE", "None set")
+    
+    if local:
+        console.print()
+        console.print("[bold]Installed RICEs:[/bold]")
+        for rice in local:
+            marker = " [green]*[/green]" if rice["name"] == active else ""
+            console.print(f"  [cyan]{rice['name']}[/cyan]{marker}")
+    else:
+        console.print()
+        console.print("[dim]No RICEs installed[/dim]")
+
 def handle_rice(args: list[str]):
     """Handle rice subcommands."""
     if not args or args[0] == "list":
@@ -259,8 +283,10 @@ def handle_rice(args: list[str]):
         rice_delete(args[1])
     elif args[0] == "backup" and len(args) > 1:
         rice_backup(args[1])
+    elif args[0] == "check":
+        rice_check()
     else:
-        error_box("Error", "Usage: rice [list|set|install|delete|backup] [args]")
+        error_box("Error", "Usage: rice [list|set|install|delete|backup|check] [args]")
 
 def run_interactive():
     """Run interactive TUI menu."""
@@ -316,11 +342,12 @@ def run_interactive():
                 # RICE submenu
                 from InquirerPy import inquirer
                 rice_choices = [
-                    {"name": "[1] List RICEs", "value": "list"},
-                    {"name": "[2] Set/Download RICE", "value": "set"},
-                    {"name": "[3] Install from git URL", "value": "install"},
-                    {"name": "[4] Delete local RICE", "value": "delete"},
-                    {"name": "[5] Backup current", "value": "backup"},
+                    {"name": "[1] Check active RICE", "value": "check"},
+                    {"name": "[2] List RICEs", "value": "list"},
+                    {"name": "[3] Set/Download RICE", "value": "set"},
+                    {"name": "[4] Install from git URL", "value": "install"},
+                    {"name": "[5] Delete local RICE", "value": "delete"},
+                    {"name": "[6] Backup current", "value": "backup"},
                     {"name": "[x] Back", "value": "back"},
                 ]
                 rice_action = inquirer.select(
@@ -328,7 +355,9 @@ def run_interactive():
                     choices=rice_choices,
                 ).execute()
 
-                if rice_action == "list":
+                if rice_action == "check":
+                    rice_check()
+                elif rice_action == "list":
                     rice_list()
                 elif rice_action == "set":
                     from _lib.utils.rice_manager import fetch_official_rices
