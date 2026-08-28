@@ -129,7 +129,7 @@ echo "  [1] Full setup (all modules)"
 echo "  [2] Minimal (shell + tools only)"
 echo "  [3] Skip (configure later)"
 echo ""
-read -p "  Choice [1]: " choice
+read -p "  Choice [1]: " choice < /dev/tty
 choice="${choice:-1}"
 
 case "$choice" in
@@ -167,7 +167,7 @@ else
     done
     echo "  [s] Skip"
     echo ""
-    read -p "  Choice [1]: " rice_input
+    read -p "  Choice [1]: " rice_input < /dev/tty
     rice_input="${rice_input:-1}"
 
     if [ "$rice_input" = "s" ] || [ "$rice_input" = "S" ]; then
