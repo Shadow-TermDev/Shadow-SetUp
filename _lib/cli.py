@@ -205,67 +205,71 @@ exec python3 "{SHADOW_DATA}/_lib/cli.py" "$@"
 
 def run_interactive():
     """Run interactive TUI menu."""
+    from InquirerPy import inquirer
+    
     while True:
-        action = interactive_menu()
-        
-        if action == "exit":
-            console.print("[dim]Bye![/dim]")
-            break
-        
-        console.clear()
-        
-        if action == "install":
-            from InquirerPy import inquirer
-            choices = list(MODULES.keys()) + ["all"]
-            selected = inquirer.checkbox(
-                message="Select modules to install:",
-                choices=choices,
-            ).execute()
-            if selected:
-                if "all" in selected:
-                    install_modules(list(MODULES.keys()))
-                else:
+        try:
+            action = interactive_menu()
+            
+            if action == "exit":
+                console.print("[dim]Bye![/dim]")
+                break
+            
+            console.clear()
+            
+            if action == "install":
+                choices = list(MODULES.keys()) + ["[cancel]"]
+                selected = inquirer.checkbox(
+                    message="Select modules to install:",
+                    choices=choices,
+                ).execute()
+                if selected and "[cancel]" not in selected:
                     install_modules(selected)
+            
+            elif action == "update":
+                choices = list(MODULES.keys()) + ["all", "[cancel]"]
+                selected = inquirer.checkbox(
+                    message="Select modules to update:",
+                    choices=choices,
+                ).execute()
+                if selected and "[cancel]" not in selected:
+                    if "all" in selected:
+                        update_modules()
+                    else:
+                        update_modules(selected)
+            
+            elif action == "uninstall":
+                choices = list(MODULES.keys()) + ["[cancel]"]
+                selected = inquirer.checkbox(
+                    message="Select modules to uninstall:",
+                    choices=choices,
+                ).execute()
+                if selected and "[cancel]" not in selected:
+                    uninstall_modules(selected)
+            
+            elif action == "list":
+                list_modules()
+            
+            elif action == "status":
+                show_status()
+            
+            elif action == "update-core":
+                update_core()
+            
+            elif action == "version":
+                console.print(f"Shadow-SetUp v{__version__}")
+            
+            # Pause before returning to menu
+            if action != "exit":
+                console.print()
+                input("Press Enter to continue...")
         
-        elif action == "update":
-            from InquirerPy import inquirer
-            choices = list(MODULES.keys()) + ["all"]
-            selected = inquirer.checkbox(
-                message="Select modules to update:",
-                choices=choices,
-            ).execute()
-            if selected:
-                if "all" in selected:
-                    update_modules()
-                else:
-                    update_modules(selected)
-        
-        elif action == "uninstall":
-            from InquirerPy import inquirer
-            choices = list(MODULES.keys())
-            selected = inquirer.checkbox(
-                message="Select modules to uninstall:",
-                choices=choices,
-            ).execute()
-            if selected:
-                uninstall_modules(selected)
-        
-        elif action == "list":
-            list_modules()
-        
-        elif action == "status":
-            show_status()
-        
-        elif action == "update-core":
-            update_core()
-        
-        elif action == "version":
-            console.print(f"Shadow-SetUp v{__version__}")
-        
-        # Pause before returning to menu
-        if action != "exit":
-            console.print()
-            input("Press Enter to continue...")
+        except KeyboardInterrupt:
+            console.print("\n[dim]Cancelled[/dim]")
+            continue
+        except EOFError:
+            console.print("\n[dim]Bye![/dim]")
+            break
 
 def main():
     """Main entry point."""
@@ -287,35 +291,39 @@ def main():
     if command in NEEDS_BANNER:
         console.clear()
     
-    if command == "help" or command == "--help" or command == "-h":
-        show_help()
-    elif command == "version" or command == "--version":
-        console.print(f"Shadow-SetUp v{__version__}")
-    elif command == "list":
-        list_modules()
-    elif command == "install":
-        if not module_args:
-            error_box("Error", "Specify module(s) to install")
-            sys.exit(1)
-        install_modules(module_args)
-    elif command == "update":
-        if module_args and module_args[0] == "core":
+    try:
+        if command == "help" or command == "--help" or command == "-h":
+            show_help()
+        elif command == "version" or command == "--version":
+            console.print(f"Shadow-SetUp v{__version__}")
+        elif command == "list":
+            list_modules()
+        elif command == "install":
+            if not module_args:
+                error_box("Error", "Specify module(s) to install")
+                sys.exit(1)
+            install_modules(module_args)
+        elif command == "update":
+            if module_args and module_args[0] == "core":
+                update_core()
+            else:
+                update_modules(module_args if module_args else None)
+        elif command == "update-core":
             update_core()
+        elif command == "uninstall":
+            if not module_args:
+                error_box("Error", "Specify module(s) to uninstall")
+                sys.exit(1)
+            uninstall_modules(module_args)
+        elif command == "status":
+            show_status(module_args if module_args else None)
         else:
-            update_modules(module_args if module_args else None)
-    elif command == "update-core":
-        update_core()
-    elif command == "uninstall":
-        if not module_args:
-            error_box("Error", "Specify module(s) to uninstall")
+            error_box("Error", f"Unknown command: {command}")
+            show_help()
             sys.exit(1)
-        uninstall_modules(module_args)
-    elif command == "status":
-        show_status(module_args if module_args else None)
-    else:
-        error_box("Error", f"Unknown command: {command}")
-        show_help()
-        sys.exit(1)
+    except KeyboardInterrupt:
+        console.print("\n[dim]Cancelled[/dim]")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

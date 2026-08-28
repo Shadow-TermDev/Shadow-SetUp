@@ -22,6 +22,30 @@ MODULES = {
     "aliases": AliasesModule(),
 }
 
+def bump_version(bump_type: str = "patch") -> str:
+    """Bump version in .version file."""
+    version_file = Path(__file__).parent.parent.parent / ".version"
+    if not version_file.exists():
+        return "0.0.1"
+    
+    version = version_file.read_text().strip()
+    parts = version.split(".")
+    if len(parts) != 3:
+        return "0.0.1"
+    
+    major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+    
+    if bump_type == "major":
+        major += 1; minor = 0; patch = 0
+    elif bump_type == "minor":
+        minor += 1; patch = 0
+    else:
+        patch += 1
+    
+    new_version = f"{major}.{minor}.{patch}"
+    version_file.write_text(new_version + "\n")
+    return new_version
+
 def handle_initialize(params: dict) -> dict:
     return {
         "protocolVersion": "2024-11-05",
@@ -89,6 +113,20 @@ def handle_tools_list(params: dict) -> dict:
                         }
                     }
                 }
+            },
+            {
+                "name": "shadow_bump_version",
+                "description": "Bump version in .version file (call before commit/push)",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": ["major", "minor", "patch"],
+                            "description": "Version bump type (default: patch)"
+                        }
+                    }
+                }
             }
         ]
     }
@@ -150,6 +188,11 @@ def handle_tools_call(params: dict) -> dict:
             if key:
                 return {key: config.get(key)}
             return config
+        
+        elif tool_name == "shadow_bump_version":
+            bump_type = arguments.get("type", "patch")
+            new_version = bump_version(bump_type)
+            return {"success": True, "version": new_version}
         
         else:
             return {"error": f"Unknown tool: {tool_name}"}

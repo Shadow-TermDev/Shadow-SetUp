@@ -198,23 +198,26 @@ def interactive_menu():
     from InquirerPy import inquirer
     
     choices = [
-        {"name": "📦  Install module", "value": "install"},
-        {"name": "🔄  Update modules", "value": "update"},
-        {"name": "🗑️   Uninstall module", "value": "uninstall"},
-        {"name": "📋  List modules", "value": "list"},
-        {"name": "📊  System status", "value": "status"},
-        {"name": "⬆️   Update framework", "value": "update-core"},
-        {"name": "ℹ️   Version info", "value": "version"},
-        {"name": "🚪  Exit", "value": "exit"},
+        {"name": "[1] Install module", "value": "install"},
+        {"name": "[2] Update modules", "value": "update"},
+        {"name": "[3] Uninstall module", "value": "uninstall"},
+        {"name": "[4] List modules", "value": "list"},
+        {"name": "[5] System status", "value": "status"},
+        {"name": "[6] Update framework", "value": "update-core"},
+        {"name": "[7] Version info", "value": "version"},
+        {"name": "[x] Exit", "value": "exit"},
     ]
     
     console.clear()
     banner()
     
-    action = inquirer.select(
-        message="What do you want to do?",
-        choices=choices,
-        default="install",
-    ).execute()
+    try:
+        action = inquirer.select(
+            message="What do you want to do?",
+            choices=choices,
+            default="install",
+        ).execute()
+    except KeyboardInterrupt:
+        return "exit"
     
     return action
