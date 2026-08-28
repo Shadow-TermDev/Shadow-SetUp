@@ -101,12 +101,22 @@ def get_active_rice() -> str | None:
     return None
 
 def download_rice(rice_name: str, rice_info: dict) -> bool:
-    """Download a RICE from GitHub."""
+    """Download a RICE from GitHub (or skip if local)."""
     ensure_dirs()
 
     rice_dir = RICES_DIR / rice_name
     if rice_dir.exists() and (rice_dir / "rice.sh").exists():
         return True  # Already downloaded
+
+    # Local RICEs are bundled with Shadow-SetUp
+    if rice_info.get("local"):
+        # Check if it exists in the repo's dotfiles/rices/
+        repo_rice = Path(__file__).parent.parent.parent / "dotfiles" / "rices" / rice_name
+        if repo_rice.exists() and (repo_rice / "rice.sh").exists():
+            shutil.copytree(repo_rice, rice_dir)
+            return True
+        error_box("Rice", f"Local RICE '{rice_name}' not found in repo")
+        return False
 
     url = rice_info.get("url", RICES_REPO_BASE)
     path = rice_info.get("path", rice_name)
@@ -187,8 +197,10 @@ def apply_rice_files(rice_name: str) -> bool:
                 shutil.copy2(src, termux_dir / file_name)
 
         # Reload Termux settings
-        if subprocess.run(["command", "-v", "termux-reload-settings"], capture_output=True).returncode == 0:
-            subprocess.run(["termux-reload-settings"], capture_output=True)
+        try:
+            subprocess.run(["termux-reload-settings"], capture_output=True, timeout=5)
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass  # termux-reload-settings not available
 
         return True
 

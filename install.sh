@@ -200,12 +200,13 @@ esac
 echo ""
 echo -e "${BOLD}Select a RICE theme:${NC}"
 echo ""
-echo "  [1] default    - Clean, minimal theme"
-echo "  [2] kawaii     - Cute theme with TTS"
-echo "  [3] cyberpunk  - Neon futuristic theme"
-echo "  [4] minimal    - No animations, pure speed"
-echo "  [5] hacker     - Matrix-style green"
-echo "  [6] Skip (no RICE)"
+echo "  [1] default     - Clean, minimal theme"
+echo "  [2] kawaii      - Cute theme with TTS"
+echo "  [3] cyberpunk   - Neon futuristic theme"
+echo "  [4] minimal     - No animations, pure speed"
+echo "  [5] hacker      - Matrix-style green"
+echo "  [6] term-shadow - Personal theme (argonaut)"
+echo "  [7] Skip (no RICE)"
 echo ""
 read -p "  Choice [1]: " rice_choice
 rice_choice="${rice_choice:-1}"
@@ -216,7 +217,8 @@ case "$rice_choice" in
     3) python3 "$SHADOW_DATA/_lib/cli.py" rice set cyberpunk ;;
     4) python3 "$SHADOW_DATA/_lib/cli.py" rice set minimal ;;
     5) python3 "$SHADOW_DATA/_lib/cli.py" rice set hacker ;;
-    6) info "No RICE selected" ;;
+    6) python3 "$SHADOW_DATA/_lib/cli.py" rice set term-shadow ;;
+    7) info "No RICE selected" ;;
     *) warn "Invalid choice, using default..." && python3 "$SHADOW_DATA/_lib/cli.py" rice set default ;;
 esac
 

@@ -24,6 +24,10 @@
       "description": "Matrix-style green on black with scanlines",
       "url": "https://github.com/Shadow-TermDev/rices",
       "path": "hacker"
+    },
+    "term-shadow": {
+      "description": "Personal theme — argonaut colors, JetBrains Mono, no TTS",
+      "local": true
     }
   }
 }
