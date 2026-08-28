@@ -175,7 +175,7 @@ else
     elif [ "$rice_input" -ge 1 ] && [ "$rice_input" -le "$RICE_COUNT" ] 2>/dev/null; then
         PICKED="${RICE_LIST[$((rice_input-1))]}"
         info "Activating '$PICKED'..."
-        python3 "$SHADOW_DATA/_lib/cli.py" rice set "$PICKED"
+        python3 "$SHADOW_DATA/_lib/cli.py" rice set "$PICKED" < /dev/tty
     else
         warn "Invalid choice, skipping..."
     fi
