@@ -53,6 +53,9 @@ class ToolsModule(BaseModule):
             run_cmd(["pkg", "upgrade", "-y"], capture=True, timeout=300)
             success_box("Tools module", "Update complete!")
             return True
+        except KeyboardInterrupt:
+            info_box("Tools module", "Update cancelled")
+            return False
         except subprocess.TimeoutExpired:
             error_box("Tools module", "Update timed out")
             return False

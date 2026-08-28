@@ -37,6 +37,8 @@ _COMMANDS_DIR = Path(__file__).parent
 
 def _make_command(cls) -> Command:
     """Create a Command instance from a class with class-level attributes."""
+    import types
+    
     cmd = Command.__new__(Command)
     cmd.name = getattr(cls, 'name', '')
     cmd.aliases = getattr(cls, 'aliases', [])
@@ -50,10 +52,17 @@ def _make_command(cls) -> Command:
     cmd.has_submenu = getattr(cls, 'has_submenu', False)
     cmd.handler = getattr(cls, 'handler', '')
     cmd.handler_func = getattr(cls, 'handler_func', '')
-    # Bind execute from the subclass
-    if hasattr(cls, 'execute') and callable(getattr(cls, 'execute')):
-        import types
-        cmd.execute = types.MethodType(cls.execute, cmd)
+    
+    # Bind ALL methods from the subclass (including private methods)
+    for attr_name in dir(cls):
+        if attr_name.startswith('__'):
+            continue
+        attr = getattr(cls, attr_name)
+        if callable(attr) and attr_name not in ('name', 'aliases', 'description', 'usage', 'examples', 'tui_label', 'tui_position', 'tui_section', 'needs_args', 'has_submenu', 'handler', 'handler_func'):
+            # Create a bound method
+            bound = types.MethodType(attr, cmd)
+            setattr(cmd, attr_name, bound)
+    
     return cmd
 
 def load_commands() -> list[Command]:

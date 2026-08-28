@@ -103,6 +103,9 @@ class ShellModule(BaseModule):
             success_box("Shell module", "Update complete!")
             return True
         
+        except KeyboardInterrupt:
+            info_box("Shell module", "Update cancelled")
+            return False
         except subprocess.TimeoutExpired:
             error_box("Shell module", "Update timed out")
             return False
