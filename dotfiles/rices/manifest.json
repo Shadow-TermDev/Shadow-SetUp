@@ -2,31 +2,14 @@
   "official_rices": {
     "default": {
       "description": "Clean, minimal theme with subtle animations",
-      "url": "https://github.com/Shadow-TermDev/rices",
-      "path": "default"
+      "local": true
     },
     "kawaii": {
       "description": "Cute theme with TTS and kawaii vibes",
-      "url": "https://github.com/Shadow-TermDev/rices",
-      "path": "kawaii"
-    },
-    "cyberpunk": {
-      "description": "Neon colors and futuristic animations",
-      "url": "https://github.com/Shadow-TermDev/rices",
-      "path": "cyberpunk"
-    },
-    "minimal": {
-      "description": "No animations, no TTS, pure performance",
-      "url": "https://github.com/Shadow-TermDev/rices",
-      "path": "minimal"
-    },
-    "hacker": {
-      "description": "Matrix-style green on black with scanlines",
-      "url": "https://github.com/Shadow-TermDev/rices",
-      "path": "hacker"
+      "local": true
     },
     "term-shadow": {
-      "description": "Personal theme — argonaut colors, JetBrains Mono, no TTS",
+      "description": "Personal theme — argonaut colors, JetBrains Mono",
       "local": true
     }
   }

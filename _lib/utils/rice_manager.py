@@ -19,8 +19,8 @@ def ensure_dirs():
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 def fetch_official_rices() -> dict:
-    """Fetch official RICEs from manifest (local or remote)."""
-    # Try local manifest first
+    """Fetch official RICEs from manifest (local only)."""
+    # Try local manifest first (bundled with project)
     local_manifest = Path(__file__).parent.parent.parent / "dotfiles" / "rices" / "manifest.json"
     if local_manifest.exists():
         try:
@@ -29,26 +29,23 @@ def fetch_official_rices() -> dict:
         except Exception:
             pass
 
-    # Try remote manifest
-    try:
-        result = subprocess.run(
-            ["curl", "-fsSL", MANIFEST_URL],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode == 0:
-            data = json.loads(result.stdout)
+    # Try installed manifest
+    installed_manifest = RICES_DIR / "manifest.json"
+    if installed_manifest.exists():
+        try:
+            data = json.loads(installed_manifest.read_text())
             return data.get("official_rices", {})
-    except Exception:
-        pass
+        except Exception:
+            pass
 
-    # Fallback: minimal hardcoded list
-    return {
-        "default": {"description": "Clean, minimal theme", "url": RICES_REPO_BASE, "path": "default"},
-        "kawaii": {"description": "Cute theme with TTS", "url": RICES_REPO_BASE, "path": "kawaii"},
-        "cyberpunk": {"description": "Neon futuristic theme", "url": RICES_REPO_BASE, "path": "cyberpunk"},
-        "minimal": {"description": "No animations, pure performance", "url": RICES_REPO_BASE, "path": "minimal"},
-        "hacker": {"description": "Matrix-style green theme", "url": RICES_REPO_BASE, "path": "hacker"},
-    }
+    # Fallback: only RICEs that actually exist locally
+    rices = {}
+    if RICES_DIR.exists():
+        for rice_dir in sorted(RICES_DIR.iterdir()):
+            if rice_dir.is_dir() and (rice_dir / "rice.sh").exists():
+                rices[rice_dir.name] = {"description": "", "local": True}
+
+    return rices
 
 def list_local_rices() -> list[dict]:
     """List locally installed RICEs."""
@@ -227,11 +224,27 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = True) -> bool:
     """Download (if needed) and apply a RICE."""
     ensure_dirs()
 
+    # Check if RICE exists locally first
+    rice_dir = RICES_DIR / rice_name
+    if rice_dir.exists() and (rice_dir / "rice.sh").exists():
+        # Already downloaded, just apply
+        active = get_active_rice()
+        if active and active != rice_name and keep_backup:
+            backup_current_rice(active)
+        if apply_rice_files(rice_name):
+            success_box("Rice", f"'{rice_name}' activated")
+            return True
+        return False
+
     # Fetch manifest
     official = fetch_official_rices()
 
     if rice_name in official:
         rice_info = official[rice_name]
+        # Check if it's local only
+        if rice_info.get("local"):
+            error_box("Rice", f"'{rice_name}' not downloaded. Run: sw install fonts (or copy to {RICES_DIR}/{rice_name}/)")
+            return False
     else:
         error_box("Rice", f"'{rice_name}' not found. Use 'sw rice install <url>' for custom RICEs.")
         return False
