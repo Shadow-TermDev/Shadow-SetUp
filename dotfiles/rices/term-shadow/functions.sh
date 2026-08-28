@@ -34,11 +34,11 @@ bak()       { cp "$1"{,.bak.$(date +%Y%m%d%H%M%S)}; }
 portcheck() { ss -tulanp 2>/dev/null | grep ":$1 " || echo "Puerto $1 libre"; }
 
 # -----------------------------------------------
-# Git helpers
+# Git helpers (not conflicting with aliases)
 # -----------------------------------------------
 gcom() { git commit -m "$1"; }
 gcof() { git checkout "$1" 2>/dev/null || git checkout -b "$1"; }
-glg()  { git log --oneline --graph --decorate -${1:-20}; }
+glog() { git log --oneline --graph --decorate -${1:-20}; }
 
 # -----------------------------------------------
 # Quick shortcuts
