@@ -12,6 +12,7 @@ from rich.columns import Columns
 from rich.align import Align
 from rich import box
 from rich.theme import Theme
+from rich.markup import escape as rich_escape
 
 # Custom theme
 SHADOW_THEME = Theme({
@@ -70,7 +71,7 @@ def banner():
         ascii_art = "Shadow-SetUp"
 
     for line in ascii_art.rstrip().split("\n"):
-        console.print(Align.center(f"[bold cyan]{line}[/bold cyan]"))
+        console.print(Align.center(f"[bold cyan]{rich_escape(line)}[/bold cyan]"))
 
     console.print(Align.center("[dim]Modular Termux Environment Manager[/dim]"))
     console.print()

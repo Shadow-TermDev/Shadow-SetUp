@@ -41,11 +41,10 @@ class HelpCommand(Command):
 
         # RICE
         console.print("[bold]RICE:[bold]")
-        rice_cmds = [c for c in commands if c.name == "rice"]
-        console.print("  [cyan]rice list[/cyan]      List available RICEs")
-        console.print("  [cyan]rice set[/cyan]       Set active RICE")
-        console.print("  [cyan]rice check[/cyan]     Show active RICE")
-        console.print("  [cyan]rice install[/cyan]   Install RICE from git")
+        rice_cmd = next((c for c in commands if c.name == "rice"), None)
+        if rice_cmd and hasattr(rice_cmd, 'subcommands'):
+            for sub, desc in rice_cmd.subcommands.items():
+                console.print(f"  [cyan]rice {sub}[/cyan]{' ' * (10 - len(sub))}{desc}")
         console.print()
 
         # Examples

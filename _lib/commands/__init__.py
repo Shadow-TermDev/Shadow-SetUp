@@ -52,13 +52,14 @@ def _make_command(cls) -> Command:
     cmd.has_submenu = getattr(cls, 'has_submenu', False)
     cmd.handler = getattr(cls, 'handler', '')
     cmd.handler_func = getattr(cls, 'handler_func', '')
+    cmd.subcommands = getattr(cls, 'subcommands', None)
     
     # Bind ALL methods from the subclass (including private methods)
     for attr_name in dir(cls):
         if attr_name.startswith('__'):
             continue
         attr = getattr(cls, attr_name)
-        if callable(attr) and attr_name not in ('name', 'aliases', 'description', 'usage', 'examples', 'tui_label', 'tui_position', 'tui_section', 'needs_args', 'has_submenu', 'handler', 'handler_func'):
+        if callable(attr) and attr_name not in ('name', 'aliases', 'description', 'usage', 'examples', 'tui_label', 'tui_position', 'tui_section', 'needs_args', 'has_submenu', 'handler', 'handler_func', 'subcommands'):
             # Create a bound method
             bound = types.MethodType(attr, cmd)
             setattr(cmd, attr_name, bound)

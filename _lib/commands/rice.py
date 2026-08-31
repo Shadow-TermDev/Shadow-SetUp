@@ -20,6 +20,16 @@ class RiceCommand(Command):
     tui_section = "main"
     has_submenu = True
 
+    subcommands = {
+        "list":    "List available RICEs",
+        "set":     "Set active RICE",
+        "check":   "Show active RICE",
+        "install": "Install RICE from git",
+        "delete":  "Delete a local RICE",
+        "backup":  "Backup current RICE",
+        "reset":   "Clean all rice-installed files",
+    }
+
     def execute(self, args: list[str] = None) -> None:
         from _lib.utils.ui import console, banner, error_box
 
