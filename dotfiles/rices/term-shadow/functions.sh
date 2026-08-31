@@ -36,13 +36,13 @@ portcheck() { ss -tulanp 2>/dev/null | grep ":$1 " || echo "Port $1 is free"; }
 # -----------------------------------------------
 # Git helpers (names don't conflict with OMZ aliases)
 # -----------------------------------------------
-gcom() { git commit -m "$1"; }
-gcof() { git checkout "$1" 2>/dev/null || git checkout -b "$1"; }
-glog() { git log --oneline --graph --decorate -${1:-20}; }
+gtcom() { git commit -m "$1"; }
+gtcof() { git checkout "$1" 2>/dev/null || git checkout -b "$1"; }
+gtlog() { git log --oneline --graph --decorate -${1:-20}; }
 
 # -----------------------------------------------
 # Quick shortcuts
 # -----------------------------------------------
-..()   { cd ..; }
-...()  { cd ../..; }
-....() { cd ../../..; }
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
