@@ -579,7 +579,7 @@ def backup_current_rice(rice_name: str, ask: bool = True) -> bool:
     return False
 
 
-def download_and_apply_rice(rice_name: str, keep_backup: bool = True, force: bool = False) -> bool:
+def download_and_apply_rice(rice_name: str, keep_backup: bool = False, force: bool = False) -> bool:
     """Download (if needed) and apply a RICE."""
     ensure_dirs()
 
@@ -633,6 +633,7 @@ def _apply_existing_rice(rice_name: str) -> bool:
     # 3. Apply files
     if apply_rice_files(rice_dir):
         success_box("Rice", f"'{rice_name}' activated")
+        console.print("[dim]Run [cyan]exec zsh[/cyan] or restart terminal to apply aliases.[/dim]")
         return True
     return False
 
