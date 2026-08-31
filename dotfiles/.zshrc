@@ -143,3 +143,6 @@ SHADOW_ALIASES="$HOME/.shadow-setup/aliases.sh"
 # RICE functions
 SHADOW_FUNCTIONS="$HOME/.shadow-setup/functions.sh"
 [ -f "$SHADOW_FUNCTIONS" ] && source "$SHADOW_FUNCTIONS"
+
+# Asegurar que los alias estén habilitados (p10k los desactiva temporalmente con no_aliases)
+setopt aliases 2>/dev/null || true

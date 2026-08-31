@@ -172,6 +172,28 @@ def list_local_rices() -> list[dict]:
 
 def is_active(rice_name: str) -> bool:
     """Check if a RICE is currently active."""
+    # Primary: check active_rice_name file (most reliable, avoids substring mismatch nordic vs nordic-rice-termux)
+    try:
+        name_file = SHADOW_DATA / "active_rice_name"
+        if name_file.exists():
+            active = name_file.read_text().strip()
+            if active == rice_name:
+                return True
+            # Also handle manifest name vs directory name: check manifest
+            rice_dir = RICES_DIR / rice_name
+            if rice_dir.exists():
+                manifest = load_manifest(rice_dir)
+                if manifest.get("name") == active:
+                    return True
+            # If active is manifest name, check reverse
+            active_dir = RICES_DIR / active
+            if active_dir.exists():
+                active_manifest = load_manifest(active_dir)
+                if active_manifest.get("name") == rice_name:
+                    return True
+    except Exception:
+        pass
+
     if not ACTIVE_RICE_LINK.exists():
         return False
 
@@ -188,6 +210,16 @@ def is_active(rice_name: str) -> bool:
 
 def get_active_rice() -> str | None:
     """Get the name of the currently active RICE."""
+    # Primary: active_rice_name file
+    try:
+        name_file = SHADOW_DATA / "active_rice_name"
+        if name_file.exists():
+            name = name_file.read_text().strip()
+            if name:
+                return name
+    except Exception:
+        pass
+
     if not ACTIVE_RICE_LINK.exists():
         return None
 
@@ -199,6 +231,12 @@ def get_active_rice() -> str | None:
         for rice_dir in RICES_DIR.iterdir():
             if rice_dir.name in content:
                 return rice_dir.name
+        # Fallback: check manifest name
+        for rice_dir in RICES_DIR.iterdir():
+            if rice_dir.is_dir():
+                manifest = load_manifest(rice_dir)
+                if manifest.get("name") and manifest.get("name") in content:
+                    return rice_dir.name
     except Exception:
         pass
 
@@ -464,6 +502,12 @@ def apply_rice_files(rice_dir: Path) -> bool:
         # Selective cleanup: only remove files that new rice will replace
         _selective_cleanup(rice_dir, manifest)
 
+        # Persist active RICE name for modular loader (used by active_rice.sh)
+        try:
+            (SHADOW_DATA / "active_rice_name").write_text(rice_dir.name)
+        except Exception:
+            pass
+
         # Build full file map: custom overrides > defaults
         file_map = dict(DEFAULT_FILE_MAP)
         file_map.update(custom_files)
@@ -491,6 +535,30 @@ def apply_rice_files(rice_dir: Path) -> bool:
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
             _track_installed_file(dst)
+
+            # Make active_rice.sh modular: ensure it sources its own aliases/functions
+            # Usa el método agnóstico del usuario (BASH_SOURCE) para que funcione
+            # tanto si se hace source desde bash como zsh, y sin depender del nombre del RICE
+            if dst_val == "active_rice.sh":
+                try:
+                    content = dst.read_text()
+                    # Si rice.sh ya trae su propio loader (RICE_SCRIPT_DIR), no duplicar
+                    if "RICE_SCRIPT_DIR" not in content and "# Shadow-Setup modular loader" not in content:
+                        footer = """
+# --- Shadow-Setup modular loader (auto-generated) ---
+# Cargar alias/funciones del RICE de forma agnóstica (bash/zsh)
+RICE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" 2>/dev/null && pwd || cd "$(dirname "$0")" && pwd)"
+[ -f "$RICE_SCRIPT_DIR/aliases.sh" ] && source "$RICE_SCRIPT_DIR/aliases.sh"
+[ -f "$RICE_SCRIPT_DIR/functions.sh" ] && source "$RICE_SCRIPT_DIR/functions.sh"
+# Fallback modular: si el RICE no trae aliases, usa los globales
+if ! alias ls &>/dev/null; then
+    [ -f "$HOME/.shadow-setup/aliases.sh" ] && source "$HOME/.shadow-setup/aliases.sh"
+fi
+"""
+                        with open(dst, "a") as f:
+                            f.write(footer)
+                except Exception:
+                    pass
 
         # Apply Termux config files (unless manifest says not to)
         if install_cfg.get("colors", True):
