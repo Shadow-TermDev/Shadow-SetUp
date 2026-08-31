@@ -831,20 +831,19 @@ def update_rice(rice_name: str) -> bool:
 
     info_box("Rice", f"Updating '{rice_name}'...")
     try:
-        # Detect local changes (would block pull)
+        # Record pre-update hash and detect local state
+        old_hash = subprocess.run(
+            ["git", "-C", str(rice_dir), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+
         status = subprocess.run(
             ["git", "-C", str(rice_dir), "status", "--porcelain"],
             capture_output=True, text=True, timeout=10,
         )
         has_local_changes = bool(status.stdout.strip()) if status.returncode == 0 else False
-        if has_local_changes:
-            console.print("  [warning]Local changes detected — stashing before update[/warning]")
-            subprocess.run(
-                ["git", "-C", str(rice_dir), "stash", "push", "-m", "shadow-update autostash", "--include-untracked"],
-                capture_output=True, timeout=15,
-            )
 
-        # Fetch all remotes
+        # Fetch first (prune)
         fetch = subprocess.run(
             ["git", "-C", str(rice_dir), "fetch", "--all", "--prune"],
             capture_output=True, text=True, timeout=30,
@@ -852,9 +851,37 @@ def update_rice(rice_name: str) -> bool:
         if fetch.returncode != 0:
             console.print(f"  [warning]Fetch warning: {fetch.stderr.strip()}[/warning]")
 
-        # Determine upstream branch
+        # Primary strategy: try pull --rebase --autostash which preserves local commits
+        # and dirty changes via autostash. This keeps fixes like icons=auto on top of remote.
+        pull_rb = subprocess.run(
+            ["git", "-C", str(rice_dir), "pull", "--rebase", "--autostash"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if pull_rb.returncode == 0:
+            new_hash = subprocess.run(
+                ["git", "-C", str(rice_dir), "rev-parse", "HEAD"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip()
+            if old_hash == new_hash:
+                success_box("Rice", f"'{rice_name}' already up to date")
+            else:
+                success_box("Rice", f"'{rice_name}' updated ({old_hash[:7]}..{new_hash[:7]})")
+                if is_active(rice_name):
+                    info_box("Rice", "Re-applying active rice...")
+                    apply_rice_files(rice_dir)
+            return True
+
+        # If pull --rebase failed (e.g., conflicts or old git), fallback to stash + reset
+        if has_local_changes or "would be overwritten" in (pull_rb.stderr or "") or "Your local changes" in (pull_rb.stderr or ""):
+            console.print("  [warning]Local changes would be overwritten — stashing and resetting[/warning]")
+            subprocess.run(
+                ["git", "-C", str(rice_dir), "stash", "push", "-m", "shadow-update autostash", "--include-untracked"],
+                capture_output=True, timeout=15,
+            )
+            has_local_changes = True
+
+        # Determine upstream for hard reset fallback
         upstream = None
-        # Try @{u}
         rev = subprocess.run(
             ["git", "-C", str(rice_dir), "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
             capture_output=True, text=True, timeout=5,
@@ -862,7 +889,6 @@ def update_rice(rice_name: str) -> bool:
         if rev.returncode == 0 and rev.stdout.strip() and rev.stdout.strip() != "@{u}":
             upstream = rev.stdout.strip()
         else:
-            # Fallback: origin/HEAD or origin/main or origin/master
             for candidate in ["origin/HEAD", "origin/main", "origin/master"]:
                 chk = subprocess.run(
                     ["git", "-C", str(rice_dir), "rev-parse", "--verify", candidate],
@@ -870,7 +896,6 @@ def update_rice(rice_name: str) -> bool:
                 )
                 if chk.returncode == 0:
                     upstream = candidate
-                    # origin/HEAD is symbolic, resolve to actual
                     if candidate == "origin/HEAD":
                         ref = subprocess.run(
                             ["git", "-C", str(rice_dir), "symbolic-ref", "refs/remotes/origin/HEAD"],
@@ -880,16 +905,8 @@ def update_rice(rice_name: str) -> bool:
                             upstream = ref.stdout.strip().replace("refs/remotes/", "")
                     break
 
-        # Record pre-update hash for change detection
-        old_hash = subprocess.run(
-            ["git", "-C", str(rice_dir), "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=5,
-        ).stdout.strip()
-
-        # Try hard reset to upstream if we found one, else fall back to pull --ff-only
         updated = False
         if upstream:
-            # origin/HEAD may be symbolic like origin/main, ensure we have the right name
             reset = subprocess.run(
                 ["git", "-C", str(rice_dir), "reset", "--hard", upstream],
                 capture_output=True, text=True, timeout=30,
@@ -897,29 +914,11 @@ def update_rice(rice_name: str) -> bool:
             if reset.returncode == 0:
                 updated = True
             else:
-                # fallback to pull with autostash
-                pull = subprocess.run(
-                    ["git", "-C", str(rice_dir), "pull", "--ff-only"],
-                    capture_output=True, text=True, timeout=30,
-                )
-                if pull.returncode == 0:
-                    updated = True
-                else:
-                    # last resort: pull --rebase --autostash
-                    pull2 = subprocess.run(
-                        ["git", "-C", str(rice_dir), "pull", "--rebase", "--autostash"],
-                        capture_output=True, text=True, timeout=30,
-                    )
-                    if pull2.returncode == 0:
-                        updated = True
-                    else:
-                        error_box("Rice", f"Update failed: {reset.stderr.strip() or pull.stderr.strip()}")
-                        # Try to restore stash
-                        if has_local_changes:
-                            subprocess.run(["git", "-C", str(rice_dir), "stash", "pop"], capture_output=True, timeout=10)
-                        return False
+                error_box("Rice", f"Update failed: {reset.stderr.strip() or pull_rb.stderr.strip()}")
+                if has_local_changes:
+                    subprocess.run(["git", "-C", str(rice_dir), "stash", "pop"], capture_output=True, timeout=10)
+                return False
         else:
-            # No upstream detected, try simple pull
             pull = subprocess.run(
                 ["git", "-C", str(rice_dir), "pull", "--ff-only"],
                 capture_output=True, text=True, timeout=30,
@@ -939,11 +938,8 @@ def update_rice(rice_name: str) -> bool:
 
         if old_hash == new_hash:
             success_box("Rice", f"'{rice_name}' already up to date")
-            # Drop stash if we created one and nothing changed (keep stash for manual recovery)
             if has_local_changes:
-                # Keep autostash for user to review; try to pop if clean
-                # We leave stash as is to avoid losing local work; inform user
-                console.print("  [dim]Local changes were stashed as 'shadow-update autostash' — run 'git stash pop' to restore[/dim]")
+                console.print("  [dim]Local changes stashed as 'shadow-update autostash' — run 'git stash pop' to restore[/dim]")
         else:
             success_box("Rice", f"'{rice_name}' updated ({old_hash[:7]}..{new_hash[:7]})")
             if has_local_changes:
