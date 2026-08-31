@@ -23,10 +23,13 @@ setopt HIST_VERIFY
 setopt NO_BEEP
 
 # -----------------------------------------------
-# RICE early load — lets rice set SHADOW_DISABLE_P10K=true
+# RICE early check — read SHADOW_DISABLE_P10K without sourcing (avoids double anim)
 # -----------------------------------------------
-SHADOW_RICE_EARLY="$HOME/.shadow-setup/active_rice.sh"
-[ -f "$SHADOW_RICE_EARLY" ] && source "$SHADOW_RICE_EARLY" 2>/dev/null || true
+if [[ -f "$HOME/.shadow-setup/active_rice.sh" ]]; then
+    if grep -q 'SHADOW_DISABLE_P10K="true"' "$HOME/.shadow-setup/active_rice.sh" 2>/dev/null; then
+        SHADOW_DISABLE_P10K="true"
+    fi
+fi
 
 # -----------------------------------------------
 # Oh My Zsh
