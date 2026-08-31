@@ -1,0 +1,12 @@
+{
+  "name": "default",
+  "version": "1.0.0",
+  "author": "Shadow-TermDev",
+  "description": "Clean, minimal Ocean theme — blue/white, Fira Code",
+  "dependencies": {},
+  "install": {
+    "colors": true,
+    "font": true,
+    "termux_properties": true
+  }
+}

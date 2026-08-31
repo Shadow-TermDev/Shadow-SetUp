@@ -4,7 +4,7 @@
 # ================================================
 
 # -----------------------------------------------
-# Esencial
+# Core
 # -----------------------------------------------
 export ZSH_DISABLE_COMPFIX=true
 export HISTFILE=/data/data/com.termux/files/home/.zsh_history
@@ -34,7 +34,7 @@ source $ZSH/oh-my-zsh.sh
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 
 # -----------------------------------------------
-# Autocompletado
+# Autocomplete
 # -----------------------------------------------
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
 ZSH_AUTOSUGGEST_STRATEGY=(history)
@@ -56,7 +56,7 @@ export PYTHONUNBUFFERED=1
 export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 
 # -----------------------------------------------
-# Hardware/Seguridad
+# Security
 # -----------------------------------------------
 umask 077
 bindkey "^H" backward-kill-word

@@ -80,14 +80,49 @@ Run `sw` with no arguments to open the TUI:
 
 ## RICE System
 
-RICEs are complete themes that include:
-- `rice.sh` — Startup animation, TTS greeting, environment variables
-- `.p10k.zsh` — Powerlevel10k prompt configuration
-- `aliases.sh` — RICE-specific aliases
-- `functions.sh` — RICE-specific functions
-- `colors.properties` — Terminal color scheme
-- `font.ttf` — Terminal font
-- `termux.properties` — Termux settings
+RICEs are flexible theme packages. **Only `manifest.json` is required** — everything else is optional.
+
+### RICE Structure
+
+```
+my-rice/
+├── manifest.json          # REQUIRED — metadata + dependencies
+├── rice.sh                # Sourced on every terminal startup
+├── setup.sh               # Runs once on first apply
+├── aliases.sh             # Shell aliases
+├── functions.sh           # Shell functions
+├── .p10k.zsh              # Powerlevel10k config
+├── colors.properties      # Termux colors
+├── font.ttf               # Termux font
+├── termux.properties      # Termux settings
+└── ...                    # Any files the creator wants
+```
+
+### manifest.json
+
+```json
+{
+  "name": "my-rice",
+  "version": "1.0.0",
+  "author": "creator",
+  "description": "...",
+  "dependencies": {
+    "packages": ["neofetch", "jq"],
+    "pip": ["img2txt"],
+    "omz_plugins": ["zsh-autosuggestions"]
+  },
+  "install": {
+    "colors": true,
+    "font": true,
+    "termux_properties": true
+  },
+  "files": {
+    "neofetch.conf": "~/.config/neofetch/config.conf"
+  }
+}
+```
+
+See [RICE_GUIDE.md](RICE_GUIDE.md) for the full specification.
 
 ### Official RICEs
 

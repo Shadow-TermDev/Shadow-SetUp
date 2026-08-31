@@ -1,11 +1,11 @@
 {
   "official_rices": {
     "default": {
-      "description": "Clean, minimal theme with subtle animations",
+      "description": "Clean, minimal Ocean theme — blue/white, Fira Code",
       "local": true
     },
     "kawaii": {
-      "description": "Cute theme with TTS and kawaii vibes",
+      "description": "Cute Pink Neon theme — magenta/pink, Hack Nerd Font",
       "local": true
     },
     "term-shadow": {

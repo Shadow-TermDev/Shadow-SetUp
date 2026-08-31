@@ -1,0 +1,12 @@
+{
+  "name": "kawaii",
+  "version": "1.0.0",
+  "author": "Shadow-TermDev",
+  "description": "Cute Pink Neon theme — magenta/pink, Hack Nerd Font",
+  "dependencies": {},
+  "install": {
+    "colors": true,
+    "font": true,
+    "termux_properties": true
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "term-shadow",
+  "version": "1.0.0",
+  "author": "Shadow-TermDev",
+  "description": "Personal theme — argonaut colors, JetBrains Mono",
+  "dependencies": {},
+  "install": {
+    "colors": true,
+    "font": true,
+    "termux_properties": true
+  }
+}
