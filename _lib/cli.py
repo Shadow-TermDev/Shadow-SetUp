@@ -89,9 +89,12 @@ def _handle_submenu(cmd):
             return
 
         if rice_action == "set":
-            from _lib.utils.rice_manager import fetch_official_rices
+            from _lib.utils.rice_manager import fetch_official_rices, list_local_rices
             official = fetch_official_rices()
-            rice_names = list(official.keys()) + ["[cancel]"]
+            local = list_local_rices()
+            local_names = {r["name"] for r in local}
+            all_rices = list(dict.fromkeys(list(official.keys()) + [r["name"] for r in local]))
+            rice_names = all_rices + ["[cancel]"]
             selected = inquirer.select(
                 message="Select RICE to activate:",
                 choices=rice_names,
