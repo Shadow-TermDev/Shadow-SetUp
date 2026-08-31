@@ -183,6 +183,19 @@ export SHADOW_RICE="my-rice"
 export BAT_THEME="Monokai Extended"
 ```
 
+## Managing RICEs
+
+```bash
+sw rice list                      # List all available RICEs
+sw rice set <name>                # Activate a RICE
+sw rice set <name> -f             # Force reinstall
+sw rice update <name>             # Update from git (re-applies if active)
+sw rice update                    # Update all installed RICEs
+sw rice check                     # Show active RICE
+sw rice reset                     # Reset to default RICE
+sw rice delete <name>             # Delete a local RICE
+```
+
 ## Publishing Your RICE
 
 1. Create a GitHub repo with your RICE files
@@ -197,6 +210,12 @@ Or for RICEs in a subdirectory:
 
 ```bash
 sw rice install https://github.com/you/rice-collection.git my-rice
+```
+
+Keep your RICE updated:
+
+```bash
+sw rice update my-rice            # Pull latest from git
 ```
 
 ## Tips

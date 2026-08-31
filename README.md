@@ -45,10 +45,13 @@ sw help
 |---------|-------------|
 | `sw rice list` | List available RICEs |
 | `sw rice set <name>` | Set active RICE |
+| `sw rice set <name> -f` | Force reinstall RICE |
 | `sw rice install <url>` | Install RICE from git |
+| `sw rice update [name]` | Update RICE from git (all if no name) |
 | `sw rice check` | Show active RICE |
 | `sw rice delete <name>` | Delete local RICE |
 | `sw rice backup <name>` | Backup current RICE |
+| `sw rice reset` | Reset to default RICE |
 
 > **Note:** `shadow` is also available as an alias for `sw`.
 
