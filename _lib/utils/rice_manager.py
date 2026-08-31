@@ -595,9 +595,6 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = False, force: bo
             shutil.rmtree(rice_dir)
 
     if is_downloaded:
-        active = get_active_rice()
-        if active and active != rice_name:
-            backup_current_rice(active, ask=keep_backup)
         return _apply_existing_rice(rice_name)
 
     # Fetch manifest
@@ -608,10 +605,6 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = False, force: bo
     else:
         error_box("Rice", f"'{rice_name}' not found. Use 'sw rice install <url>' for custom RICEs.")
         return False
-
-    active = get_active_rice()
-    if active and active != rice_name:
-        backup_current_rice(active, ask=keep_backup)
 
     console.print(f"  [cyan]Downloading '{rice_name}'...[/cyan]")
     if not download_rice(rice_name, rice_info):
