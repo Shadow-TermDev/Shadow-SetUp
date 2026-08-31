@@ -11,6 +11,7 @@ A modular Termux environment manager with a modern Python CLI and dynamic comman
 - **Dynamic commands** — Each command is a separate file, auto-discovered at runtime
 - **Dynamic TUI** — Menu generated from registered commands
 - **Auto-updates** — Update from GitHub without reinstalling
+- **MCP integration** — Agent integration via Model Context Protocol
 
 ## Quick Installation
 
@@ -107,37 +108,42 @@ sw rice install https://github.com/user/my-rice.git
 ## Project Structure
 
 ```
-~/.shadow-setup/              ← Hidden config directory
-├── _lib/                     ← CLI code
+Shadow-SetUp/
+├── .version                  # Version number
+├── install.sh                # One-line installer
+├── requirements.txt          # Python dependencies
+├── LICENSE                   # MIT License
+├── _lib/                     # CLI code
 │   ├── __init__.py
-│   ├── cli.py                ← CLI entry point
-│   ├── commands/             ← Dynamic command system
-│   │   ├── __init__.py       ← Command base class + loader
+│   ├── cli.py                # CLI entry point
+│   ├── commands/             # Dynamic command system
+│   │   ├── __init__.py       # Command base class + loader
 │   │   ├── install.py
 │   │   ├── update.py
 │   │   ├── rice.py
 │   │   └── ...
-│   ├── modules/              ← Installable modules
+│   ├── modules/              # Installable modules
 │   │   ├── shell.py
 │   │   ├── tools.py
 │   │   ├── fonts.py
 │   │   ├── dotfiles.py
 │   │   └── aliases.py
 │   ├── utils/
-│   │   ├── __init__.py       ← run_cmd(), paths
-│   │   ├── ui.py             ← Rich + pyfiglet UI
-│   │   └── rice_manager.py   ← RICE download/apply/delete
-│   └── mcp/                  ← MCP server (dev only)
-├── dotfiles/                 ← Config files
-│   ├── .zshrc                ← Minimal shell config
-│   ├── .nanorc
-│   ├── rices/                ← RICE themes
-│   │   ├── manifest.json
-│   │   ├── term-shadow/
-│   │   ├── default/
-│   │   └── kawaii/
-│   └── active_rice.sh        ← Symlink to active RICE
-└── cache/                    ← Temporary files
+│   │   ├── __init__.py       # run_cmd(), paths
+│   │   ├── ui.py             # Rich + pyfiglet UI
+│   │   └── rice_manager.py   # RICE download/apply/delete
+│   └── mcp/                  # MCP server (agent integration)
+│       ├── server.py
+│       └── README.md
+└── dotfiles/                 # Config files
+    ├── .zshrc                # Minimal shell config
+    ├── .nanorc
+    ├── rices/                # RICE themes
+    │   ├── manifest.json
+    │   ├── term-shadow/
+    │   ├── default/
+    │   └── kawaii/
+    └── active_rice.sh        # Symlink to active RICE
 ```
 
 ## Adding Custom Commands
@@ -171,6 +177,14 @@ The command is auto-discovered and added to the TUI menu.
 - Python 3.8+
 - Git
 - curl
+
+### Python Dependencies
+
+```
+rich>=10.0.0
+InquirerPy>=0.3.4
+pyfiglet>=0.8.post1
+```
 
 ## License
 

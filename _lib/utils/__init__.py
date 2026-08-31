@@ -40,11 +40,6 @@ def pkg_installed(pkg: str) -> bool:
     result = run_cmd(["pkg", "list-installed"], capture=True)
     return f"{pkg}/" in result.stdout
 
-def get_terminal_size() -> tuple[int, int]:
-    """Get terminal columns and rows."""
-    size = shutil.get_terminal_size()
-    return size.columns, size.lines
-
 def backup_file(filepath: Path) -> Optional[Path]:
     """Backup a file before overwriting."""
     if filepath.exists():

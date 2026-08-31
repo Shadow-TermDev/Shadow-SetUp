@@ -34,8 +34,8 @@ def load_modules() -> dict[str, BaseModule]:
                     break
         
         except Exception as e:
-            # Skip modules that fail to load
-            pass
+            import warnings
+            warnings.warn(f"Failed to load module '{modname}': {e}", stacklevel=2)
     
     return modules
 

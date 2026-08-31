@@ -1,5 +1,6 @@
 """Tools module — Essential packages for Termux."""
 
+import subprocess
 from _lib.modules import BaseModule
 from _lib.utils import run_cmd, pkg_installed
 from _lib.utils.ui import console, success_box, error_box, info_box

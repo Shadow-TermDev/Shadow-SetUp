@@ -53,10 +53,10 @@ command -v curl &>/dev/null || { warn "Installing curl..."; pkg install -y curl 
 ok "Dependencies ready"
 
 # -----------------------------------------------
-# Python packages
+# Python packages (basic, before clone)
 # -----------------------------------------------
 info "Installing Python packages..."
-pip install --user rich colorama InquirerPy pyfiglet &>/dev/null || warn "pip install partial fail"
+pip install --user rich InquirerPy pyfiglet &>/dev/null || warn "pip install partial fail"
 ok "Python packages installed"
 
 # -----------------------------------------------

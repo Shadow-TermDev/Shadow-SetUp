@@ -14,6 +14,13 @@ from _lib.modules.dotfiles import DotfilesModule
 from _lib.modules.aliases import AliasesModule
 from _lib.utils import SHADOW_DATA
 
+def _get_version() -> str:
+    """Read version from .version file."""
+    version_file = Path(__file__).parent.parent.parent / ".version"
+    if version_file.exists():
+        return version_file.read_text().strip()
+    return "unknown"
+
 MODULES = {
     "shell": ShellModule(),
     "tools": ToolsModule(),
@@ -50,7 +57,7 @@ def handle_initialize(params: dict) -> dict:
     return {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {}, "resources": {}},
-        "serverInfo": {"name": "shadow-setup", "version": "2.1.0"}
+        "serverInfo": {"name": "shadow-setup", "version": _get_version()}
     }
 
 def handle_tools_list(params: dict) -> dict:
@@ -146,10 +153,14 @@ def handle_tools_call(params: dict) -> dict:
         elif tool_name == "shadow_update":
             module_name = arguments.get("module")
             if module_name == "core":
-                from _lib.utils.ui import console
-                from _lib.cli import update_core
-                update_core()
-                return {"success": True, "message": "Core updated"}
+                import subprocess
+                result = subprocess.run(
+                    ["bash", "-c", "cd ~/.shadow-setup && git pull --ff-only"],
+                    capture_output=True, text=True, timeout=60
+                )
+                if result.returncode == 0:
+                    return {"success": True, "message": "Core updated"}
+                return {"error": f"Update failed: {result.stderr.strip()}"}
             elif module_name in MODULES:
                 result = MODULES[module_name].update()
                 return {"success": result, "module": module_name}

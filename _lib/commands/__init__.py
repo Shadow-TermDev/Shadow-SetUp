@@ -92,8 +92,8 @@ def load_commands() -> list[Command]:
                     break
 
         except Exception as e:
-            # Skip commands that fail to load
-            pass
+            import warnings
+            warnings.warn(f"Failed to load command '{modname}': {e}", stacklevel=2)
 
     # Sort by tui_position
     commands.sort(key=lambda c: c.tui_position or 999)
