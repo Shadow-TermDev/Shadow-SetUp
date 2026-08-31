@@ -15,6 +15,10 @@ class ShellModule(BaseModule):
         ("zsh-autosuggestions", "https://github.com/zsh-users/zsh-autosuggestions"),
         ("zsh-syntax-highlighting", "https://github.com/zsh-users/zsh-syntax-highlighting"),
     ]
+
+    OPTIONAL_PLUGINS = [
+        ("fzf", "https://github.com/junegunn/fzf"),
+    ]
     
     def install(self) -> bool:
         try:
@@ -65,6 +69,18 @@ class ShellModule(BaseModule):
                 else:
                     console.print(f"  [warning]Plugin {name} already installed, updating...[/warning]")
                     run_cmd(["git", "-C", str(plugin_dir), "pull"], check=True)
+
+            for name, repo in self.OPTIONAL_PLUGINS:
+                plugin_dir = plugins_dir / name
+                if not plugin_dir.exists():
+                    console.print(f"  [info]Installing optional plugin: {name}...[/info]")
+                    result = run_cmd(["git", "clone", "--depth=1", repo, str(plugin_dir)])
+                    if result.returncode == 0:
+                        success_box("Plugin", f"{name} installed")
+                    else:
+                        console.print(f"  [warning]Optional plugin {name} failed, skipping...[/warning]")
+                else:
+                    console.print(f"  [dim]Plugin {name} already installed[/dim]")
             
             current_shell = run_cmd(["sh", "-c", "echo $SHELL"], capture=True).stdout.strip()
             zsh_path = shutil.which("zsh") or ""

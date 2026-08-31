@@ -6,11 +6,13 @@ class RiceCommand(Command):
     name = "rice"
     aliases = []
     description = "Manage RICE themes"
-    usage = "rice [list|set|install|delete|backup|check]"
+    usage = "rice [list|set|install|delete|backup|check|reset]"
     examples = [
         "rice                 # List RICEs",
         "rice list            # List available RICEs",
         "rice set kawaii      # Activate kawaii RICE",
+        "rice set kawaii -f   # Force reinstall RICE",
+        "rice reset           # Clean all rice files",
         "rice check           # Show active RICE",
     ]
     tui_label = "[6] Manage RICEs"
@@ -31,7 +33,9 @@ class RiceCommand(Command):
         if subcmd == "list" or subcmd == "ls":
             self._rice_list()
         elif subcmd == "set" and subargs:
-            self._rice_set(subargs[0])
+            force = "--force" in subargs or "-f" in subargs
+            subargs = [a for a in subargs if a not in ("--force", "-f")]
+            self._rice_set(subargs[0], force=force)
         elif subcmd == "install" and subargs:
             self._rice_install(subargs[0])
         elif subcmd == "delete" and subargs:
@@ -40,8 +44,10 @@ class RiceCommand(Command):
             self._rice_backup(subargs[0])
         elif subcmd == "check" or subcmd == "ck":
             self._rice_check()
+        elif subcmd == "reset":
+            self._rice_reset()
         else:
-            error_box("Error", "Usage: rice [list|set|install|delete|backup|check] [args]")
+            error_box("Error", "Usage: rice [list|set|install|delete|backup|check|reset] [args]")
 
     def _rice_list(self) -> None:
         from _lib.utils.ui import console, banner
@@ -70,11 +76,11 @@ class RiceCommand(Command):
         console.print()
         console.print("[dim]* = active | + = downloaded[/dim]")
 
-    def _rice_set(self, rice_name: str) -> None:
+    def _rice_set(self, rice_name: str, force: bool = False) -> None:
         from _lib.utils.ui import banner
         from _lib.utils.rice_manager import download_and_apply_rice
         banner()
-        download_and_apply_rice(rice_name)
+        download_and_apply_rice(rice_name, force=force)
 
     def _rice_install(self, url: str) -> None:
         from _lib.utils.ui import banner
@@ -116,3 +122,9 @@ class RiceCommand(Command):
         else:
             console.print()
             console.print("[dim]No RICEs installed[/dim]")
+
+    def _rice_reset(self) -> None:
+        from _lib.utils.ui import banner
+        from _lib.utils.rice_manager import reset_rice_files
+        banner()
+        reset_rice_files()

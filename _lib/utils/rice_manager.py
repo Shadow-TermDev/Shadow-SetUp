@@ -47,6 +47,7 @@ from _lib.utils.ui import console, success_box, error_box, info_box, warning_box
 RICES_DIR = SHADOW_DATA / "dotfiles" / "rices"
 ACTIVE_RICE_LINK = SHADOW_DATA / "active_rice.sh"
 BACKUP_DIR = SHADOW_DATA / "backups" / "rices"
+INSTALLED_FILES_LOG = SHADOW_DATA / ".rice_installed_files"
 MANIFEST_URL = "https://raw.githubusercontent.com/Shadow-TermDev/Shadow-SetUp/main/dotfiles/rices/manifest.json"
 RICES_REPO_BASE = "https://github.com/Shadow-TermDev/rices"
 TERMUX_HOME = Path.home() / ".termux"
@@ -68,6 +69,44 @@ def ensure_dirs():
     """Create RICE directories."""
     RICES_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def cleanup_previous_rice():
+    """Remove files installed by the previous rice."""
+    if not INSTALLED_FILES_LOG.exists():
+        return
+
+    try:
+        lines = INSTALLED_FILES_LOG.read_text().strip().split("\n")
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            dst = Path(line)
+            if dst.exists():
+                if dst.is_file():
+                    dst.unlink()
+                elif dst.is_dir():
+                    try:
+                        dst.rmdir()
+                    except OSError:
+                        pass
+        INSTALLED_FILES_LOG.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _track_installed_file(dst: Path):
+    """Track a file that was installed by a rice for later cleanup."""
+    INSTALLED_FILES_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(INSTALLED_FILES_LOG, "a") as f:
+        f.write(str(dst) + "\n")
+
+
+def _clear_tracking():
+    """Clear the installed files tracking log."""
+    if INSTALLED_FILES_LOG.exists():
+        INSTALLED_FILES_LOG.unlink()
 
 
 def load_manifest(rice_dir: Path) -> dict:
@@ -271,6 +310,10 @@ def apply_rice_files(rice_dir: Path) -> bool:
     custom_files = manifest.get("files", {})
 
     try:
+        # CLEANUP previous rice files first
+        cleanup_previous_rice()
+        _clear_tracking()
+
         # Build full file map: custom overrides > defaults
         file_map = dict(DEFAULT_FILE_MAP)
         file_map.update(custom_files)
@@ -297,25 +340,32 @@ def apply_rice_files(rice_dir: Path) -> bool:
 
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
+            _track_installed_file(dst)
 
         # Apply Termux config files (unless manifest says not to)
         if install_cfg.get("colors", True):
             src = rice_dir / "colors.properties"
             if src.exists():
                 TERMUX_HOME.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, TERMUX_HOME / "colors.properties")
+                dst = TERMUX_HOME / "colors.properties"
+                shutil.copy2(src, dst)
+                _track_installed_file(dst)
 
         if install_cfg.get("font", True):
             src = rice_dir / "font.ttf"
             if src.exists():
                 TERMUX_HOME.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, TERMUX_HOME / "font.ttf")
+                dst = TERMUX_HOME / "font.ttf"
+                shutil.copy2(src, dst)
+                _track_installed_file(dst)
 
         if install_cfg.get("termux_properties", True):
             src = rice_dir / "termux.properties"
             if src.exists():
                 TERMUX_HOME.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, TERMUX_HOME / "termux.properties")
+                dst = TERMUX_HOME / "termux.properties"
+                shutil.copy2(src, dst)
+                _track_installed_file(dst)
 
         # Apply any extra files in the RICE dir that aren't in the map
         # and aren't manifest/setup/metadata files
@@ -335,6 +385,7 @@ def apply_rice_files(rice_dir: Path) -> bool:
                 if dst.exists():
                     shutil.rmtree(dst)
                 shutil.copytree(item, dst)
+                _track_installed_file(dst)
 
         # Reload Termux settings
         try:
@@ -354,7 +405,7 @@ def download_rice(rice_name: str, rice_info: dict) -> bool:
     ensure_dirs()
 
     rice_dir = RICES_DIR / rice_name
-    if rice_dir.exists() and (rice_dir / "rice.sh").exists() or (rice_dir / "manifest.json").exists():
+    if rice_dir.exists() and ((rice_dir / "rice.sh").exists() or (rice_dir / "manifest.json").exists()):
         return True
 
     if rice_info.get("local"):
@@ -364,7 +415,7 @@ def download_rice(rice_name: str, rice_info: dict) -> bool:
             Path.home() / ".shadow-setup" / "dotfiles" / "rices" / rice_name,
         ]
         for repo_rice in possible_paths:
-            if repo_rice.exists() and (repo_rice / "manifest.json").exists() or (repo_rice / "rice.sh").exists():
+            if repo_rice.exists() and ((repo_rice / "manifest.json").exists() or (repo_rice / "rice.sh").exists()):
                 shutil.copytree(repo_rice, rice_dir)
                 return True
         error_box("Rice", f"Local RICE '{rice_name}' not found")
@@ -445,14 +496,20 @@ def backup_current_rice(rice_name: str, ask: bool = True) -> bool:
     return False
 
 
-def download_and_apply_rice(rice_name: str, keep_backup: bool = True) -> bool:
+def download_and_apply_rice(rice_name: str, keep_backup: bool = True, force: bool = False) -> bool:
     """Download (if needed) and apply a RICE."""
     ensure_dirs()
 
     rice_dir = RICES_DIR / rice_name
-    is_downloaded = rice_dir.exists() and (
-        (rice_dir / "rice.sh").exists() or (rice_dir / "manifest.json").exists()
-    )
+
+    if not force:
+        is_downloaded = rice_dir.exists() and (
+            (rice_dir / "rice.sh").exists() or (rice_dir / "manifest.json").exists()
+        )
+    else:
+        is_downloaded = False
+        if rice_dir.exists():
+            shutil.rmtree(rice_dir)
 
     if is_downloaded:
         active = get_active_rice()
@@ -561,3 +618,26 @@ def delete_rice(rice_name: str) -> bool:
     except Exception as e:
         error_box("Rice", f"Delete failed: {e}")
         return False
+
+
+def reset_rice_files() -> bool:
+    """Remove all rice-installed files without changing active rice."""
+    cleanup_previous_rice()
+    _clear_tracking()
+
+    for f in ["colors.properties", "font.ttf", "termux.properties"]:
+        p = TERMUX_HOME / f
+        if p.exists():
+            p.unlink()
+
+    p10k = Path.home() / ".p10k.zsh"
+    if p10k.exists():
+        p10k.unlink()
+
+    try:
+        subprocess.run(["termux-reload-settings"], capture_output=True, timeout=5)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    success_box("Rice", "All rice files cleaned up")
+    return True

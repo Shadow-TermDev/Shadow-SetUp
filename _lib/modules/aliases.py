@@ -9,7 +9,7 @@ class AliasesModule(BaseModule):
     name = "aliases"
     description = "Shell aliases and functions"
     
-    ALIASES_FILE = Path(__file__).parent.parent.parent / "dotfiles" / "aliases.sh"
+    ALIASES_FILE = Path.home() / ".shadow-setup" / "dotfiles" / "aliases.sh"
     ZSHRC = Path.home() / ".zshrc"
     
     def install(self) -> bool:

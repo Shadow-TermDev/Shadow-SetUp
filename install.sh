@@ -170,13 +170,25 @@ case "$choice" in
 esac
 
 # -----------------------------------------------
+# RICE selection — ONLY COPY SELECTED ONE
+# -----------------------------------------------
+echo ""
+echo -e "${BOLD}--- RICE Selection ---${NC}"
+echo ""
+
+# RICEs from downloaded repo
+REPO_RICES="$TEMP_DIR/dotfiles/rices"
+
 # Helper: install default RICE if no local RICEs exist
 install_default_if_needed() {
     LOCAL_RICES="$SHADOW_DATA/dotfiles/rices"
     HAS_RICES=false
     if [ -d "$LOCAL_RICES" ]; then
         for d in "$LOCAL_RICES"/*; do
-            [ -d "$d" ] && [ -f "$d/rice.sh" ] && HAS_RICES=true && break
+            if [ -d "$d" ] && { [ -f "$d/rice.sh" ] || [ -f "$d/manifest.json" ]; }; then
+                HAS_RICES=true
+                break
+            fi
         done
     fi
     
@@ -192,21 +204,14 @@ install_default_if_needed() {
     fi
 }
 
-# -----------------------------------------------
-# RICE selection — ONLY COPY SELECTED ONE
-# -----------------------------------------------
-echo ""
-echo -e "${BOLD}--- RICE Selection ---${NC}"
-echo ""
-
-# RICEs from downloaded repo
-REPO_RICES="$TEMP_DIR/dotfiles/rices"
 RICE_LIST=()
 
 if [ -d "$REPO_RICES" ]; then
-    # Use find instead of glob for reliability
+    # Use find instead of glob for reliability — check for rice.sh OR manifest.json
     while IFS= read -r d; do
-        [ -f "$d/rice.sh" ] && RICE_LIST+=("$(basename "$d")")
+        if [ -f "$d/rice.sh" ] || [ -f "$d/manifest.json" ]; then
+            RICE_LIST+=("$(basename "$d")")
+        fi
     done < <(find "$REPO_RICES" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort)
 fi
 

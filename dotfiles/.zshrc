@@ -27,7 +27,15 @@ setopt NO_BEEP
 # -----------------------------------------------
 ZSH_THEME="powerlevel10k/powerlevel10k"
 export ZSH="/data/data/com.termux/files/home/.oh-my-zsh"
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting fzf python)
+
+# Auto-detect installed plugins
+_zsh_plugins=()
+for _p in zsh-autosuggestions zsh-syntax-highlighting fzf python; do
+    [[ -d "$ZSH/custom/plugins/$_p" ]] && _zsh_plugins+=("$_p")
+done
+plugins=(git "${_zsh_plugins[@]}")
+unset _p _zsh_plugins
+
 source $ZSH/oh-my-zsh.sh
 
 # Powerlevel10k config
@@ -85,7 +93,11 @@ fi
 SHADOW_RICE="$HOME/.shadow-setup/active_rice.sh"
 [ -f "$SHADOW_RICE" ] && source "$SHADOW_RICE"
 
-# RICE aliases (overrides default if present)
+# Base aliases (always loaded — includes functions like mkcd, extract)
+SHADOW_BASE_ALIASES="$HOME/.shadow-setup/dotfiles/aliases.sh"
+[ -f "$SHADOW_BASE_ALIASES" ] && source "$SHADOW_BASE_ALIASES"
+
+# RICE aliases (overrides/extends base if present)
 SHADOW_ALIASES="$HOME/.shadow-setup/aliases.sh"
 [ -f "$SHADOW_ALIASES" ] && source "$SHADOW_ALIASES"
 
