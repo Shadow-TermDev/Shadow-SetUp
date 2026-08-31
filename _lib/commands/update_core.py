@@ -46,15 +46,44 @@ class UpdateCoreCommand(Command):
                         shutil.rmtree(lib_dst)
                     shutil.copytree(lib_src, lib_dst)
 
-                # Copy dotfiles (only essential files, NOT rices)
+                # Copy dotfiles (all except rices, but preserve existing rices)
                 dotfiles_src = temp_dir / "dotfiles"
                 dotfiles_dst = SHADOW_DATA / "dotfiles"
                 if dotfiles_src.exists():
                     dotfiles_dst.mkdir(parents=True, exist_ok=True)
-                    for fname in [".zshrc", ".nanorc", "aliases.sh", "functions.sh"]:
-                        src_f = dotfiles_src / fname
-                        if src_f.exists():
-                            shutil.copy2(src_f, dotfiles_dst / fname)
+                    # Copy every top-level file/dir except 'rices'
+                    for item in dotfiles_src.iterdir():
+                        if item.name == "rices":
+                            continue
+                        dst = dotfiles_dst / item.name
+                        if item.is_dir():
+                            if dst.exists():
+                                shutil.rmtree(dst)
+                            shutil.copytree(item, dst)
+                        else:
+                            shutil.copy2(item, dst)
+
+                    # Sync active home file ~/.zshrc from the new dotfiles
+                    # This was missing and caused .zshrc to stay on old version
+                    src_zshrc = dotfiles_dst / ".zshrc"
+                    dst_zshrc = Path.home() / ".zshrc"
+                    if src_zshrc.exists():
+                        try:
+                            # Backup if differs
+                            if dst_zshrc.exists():
+                                try:
+                                    if dst_zshrc.read_text() != src_zshrc.read_text():
+                                        from _lib.utils import backup_file
+                                        backup_file(dst_zshrc)
+                                except Exception:
+                                    pass
+                            shutil.copy2(src_zshrc, dst_zshrc)
+                            console.print("  [dim].zshrc synced to home[/dim]")
+                        except Exception as e:
+                            console.print(f"  [warning]Could not sync .zshrc: {e}[/warning]")
+
+                    # Also sync base aliases if needed (kept in dotfiles, sourced by .zshrc)
+                    # No need to copy to home, just ensure dotfiles version is fresh
 
                 # Copy .version
                 version_src = temp_dir / ".version"

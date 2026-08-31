@@ -304,10 +304,14 @@ def run_setup(rice_dir: Path) -> bool:
 
 
 def _selective_cleanup(rice_dir: Path, manifest: dict):
-    """Remove only files that the new rice will replace.
+    """Limpieza modular y agnóstica al cambiar de RICE.
 
-    If new rice has font:false or no font.ttf, keep old font.
-    Same for colors, termux_properties, .p10k.zsh, etc.
+    - Elimina solo archivos que el nuevo RICE reemplazará.
+    - Respeta install:false (ej. font:false -> preserva font.ttf antiguo).
+    - Limpia huérfanos modulares: si el RICE anterior instaló un archivo
+      que el nuevo NO provee (ej. .p10k.zsh, colors, termux.properties,
+      neofetch.conf, scripts extra), se elimina para evitar residuos y
+      garantizar que cualquier RICE futuro funcione limpio.
     """
     if not INSTALLED_FILES_LOG.exists():
         return
@@ -315,10 +319,18 @@ def _selective_cleanup(rice_dir: Path, manifest: dict):
     install_cfg = manifest.get("install", {})
     custom_files = manifest.get("files", {})
 
-    # Build set of destinations that new rice WILL write
+    # Rutas que se preservan intencionalmente por install:false
+    preserved = set()
+    if not install_cfg.get("colors", True):
+        preserved.add(str(TERMUX_HOME / "colors.properties"))
+    if not install_cfg.get("font", True):
+        preserved.add(str(TERMUX_HOME / "font.ttf"))
+    if not install_cfg.get("termux_properties", True):
+        preserved.add(str(TERMUX_HOME / "termux.properties"))
+
+    # Build set of destinations que el nuevo RICE SÍ escribirá
     will_overwrite = set()
 
-    # File map destinations
     file_map = dict(DEFAULT_FILE_MAP)
     file_map.update(custom_files)
     for src_name, dst_val in file_map.items():
@@ -338,7 +350,7 @@ def _selective_cleanup(rice_dir: Path, manifest: dict):
         else:
             will_overwrite.add(str(SHADOW_DATA / dst_val))
 
-    # Termux files (only if new rice provides them and manifest allows)
+    # Termux files (solo si el nuevo RICE los provee y manifest lo permite)
     if install_cfg.get("colors", True) and (rice_dir / "colors.properties").exists():
         will_overwrite.add(str(TERMUX_HOME / "colors.properties"))
     if install_cfg.get("font", True) and (rice_dir / "font.ttf").exists():
@@ -346,7 +358,7 @@ def _selective_cleanup(rice_dir: Path, manifest: dict):
     if install_cfg.get("termux_properties", True) and (rice_dir / "termux.properties").exists():
         will_overwrite.add(str(TERMUX_HOME / "termux.properties"))
 
-    # Extra dirs
+    # Directorios extra (scripts/, .config/ etc.)
     SKIP_FILES = {"manifest.json", "setup.sh", "README.md", "LICENSE", "rices.sh", ".git", ".gitignore"}
     SKIP_PREFIXES = (".",)
     for item in rice_dir.iterdir():
@@ -357,7 +369,25 @@ def _selective_cleanup(rice_dir: Path, manifest: dict):
         if item.is_dir():
             will_overwrite.add(str(SHADOW_DATA / item.name))
 
-    # Only delete tracked files that new rice will overwrite
+    # Conjunto de destinos modulares conocidos (para detectar huérfanos)
+    modular_destinations = {
+        str(ACTIVE_RICE_LINK),
+        str(SHADOW_DATA / "aliases.sh"),
+        str(SHADOW_DATA / "functions.sh"),
+        str(Path.home() / ".p10k.zsh"),
+        str(TERMUX_HOME / "colors.properties"),
+        str(TERMUX_HOME / "font.ttf"),
+        str(TERMUX_HOME / "termux.properties"),
+        str(Path.home() / ".config/neofetch/config.conf"),
+        str(Path.home() / ".local/bin/nordic-fetch"),
+    }
+    # Añadir destinos de files custom del manifest anterior/posterior como modulares
+    for dst_val in list(DEFAULT_FILE_MAP.values()) + list(custom_files.values()):
+        if dst_val.startswith("~/"):
+            modular_destinations.add(str(Path.home() / dst_val[2:]))
+        elif dst_val.startswith("/"):
+            modular_destinations.add(str(Path(dst_val)))
+
     try:
         lines = INSTALLED_FILES_LOG.read_text().strip().split("\n")
         remaining = []
@@ -365,20 +395,57 @@ def _selective_cleanup(rice_dir: Path, manifest: dict):
             line = line.strip()
             if not line:
                 continue
+            # Caso 1: será sobrescrito -> borrar previo
             if line in will_overwrite:
+                if line not in preserved:
+                    dst = Path(line)
+                    if dst.exists():
+                        if dst.is_file() or dst.is_symlink():
+                            try:
+                                dst.unlink()
+                            except Exception:
+                                pass
+                        elif dst.is_dir():
+                            try:
+                                shutil.rmtree(dst)
+                            except Exception:
+                                try:
+                                    dst.rmdir()
+                                except Exception:
+                                    pass
+                else:
+                    # Preservado intencionalmente -> mantener tracking
+                    remaining.append(line)
+                    continue
+            # Caso 2: huérfano modular (trackeado pero nuevo RICE no lo provee) -> limpiar
+            elif line in modular_destinations and line not in preserved:
                 dst = Path(line)
                 if dst.exists():
-                    if dst.is_file():
-                        dst.unlink()
-                    elif dst.is_dir():
-                        try:
-                            dst.rmdir()
-                        except OSError:
-                            pass
+                    try:
+                        if dst.is_file() or dst.is_symlink():
+                            dst.unlink()
+                        elif dst.is_dir():
+                            shutil.rmtree(dst)
+                    except Exception:
+                        pass
+                # No re-agregar a remaining -> limpieza completa
+            # Caso 3: directorios extra huérfanos bajo ~/.shadow-setup/
+            elif line.startswith(str(SHADOW_DATA)) and line not in will_overwrite:
+                dst = Path(line)
+                # Si es un dir extra que el nuevo RICE no tiene, eliminarlo
+                if dst.exists():
+                    # Solo borrar si no es un will_overwrite preservado
+                    try:
+                        if dst.is_dir():
+                            shutil.rmtree(dst)
+                        elif dst.is_file():
+                            dst.unlink()
+                    except Exception:
+                        pass
             else:
+                # No es modular ni será sobrescrito -> mantener
                 remaining.append(line)
 
-        # Keep remaining tracked files
         if remaining:
             INSTALLED_FILES_LOG.write_text("\n".join(remaining) + "\n")
         else:
@@ -746,7 +813,7 @@ def reset_rice_files() -> bool:
 
 
 def update_rice(rice_name: str) -> bool:
-    """Update a rice from its git repo (if it has .git)."""
+    """Update a rice from its git repo (if it has .git). Handle local changes robustly."""
     rice_dir = RICES_DIR / rice_name
 
     if not rice_dir.exists():
@@ -764,24 +831,128 @@ def update_rice(rice_name: str) -> bool:
 
     info_box("Rice", f"Updating '{rice_name}'...")
     try:
-        result = subprocess.run(
-            ["git", "-C", str(rice_dir), "pull", "--ff-only"],
+        # Detect local changes (would block pull)
+        status = subprocess.run(
+            ["git", "-C", str(rice_dir), "status", "--porcelain"],
+            capture_output=True, text=True, timeout=10,
+        )
+        has_local_changes = bool(status.stdout.strip()) if status.returncode == 0 else False
+        if has_local_changes:
+            console.print("  [warning]Local changes detected — stashing before update[/warning]")
+            subprocess.run(
+                ["git", "-C", str(rice_dir), "stash", "push", "-m", "shadow-update autostash", "--include-untracked"],
+                capture_output=True, timeout=15,
+            )
+
+        # Fetch all remotes
+        fetch = subprocess.run(
+            ["git", "-C", str(rice_dir), "fetch", "--all", "--prune"],
             capture_output=True, text=True, timeout=30,
         )
-        if result.returncode == 0:
-            output = result.stdout.strip()
-            if "Already up to date" in output or "Already up-to-date" in output:
-                success_box("Rice", f"'{rice_name}' already up to date")
-            else:
-                success_box("Rice", f"'{rice_name}' updated")
-                # Re-apply if it's the active rice
-                if is_active(rice_name):
-                    info_box("Rice", "Re-applying active rice...")
-                    apply_rice_files(rice_dir)
-            return True
+        if fetch.returncode != 0:
+            console.print(f"  [warning]Fetch warning: {fetch.stderr.strip()}[/warning]")
+
+        # Determine upstream branch
+        upstream = None
+        # Try @{u}
+        rev = subprocess.run(
+            ["git", "-C", str(rice_dir), "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if rev.returncode == 0 and rev.stdout.strip() and rev.stdout.strip() != "@{u}":
+            upstream = rev.stdout.strip()
         else:
-            error_box("Rice", f"Update failed: {result.stderr.strip()}")
-            return False
+            # Fallback: origin/HEAD or origin/main or origin/master
+            for candidate in ["origin/HEAD", "origin/main", "origin/master"]:
+                chk = subprocess.run(
+                    ["git", "-C", str(rice_dir), "rev-parse", "--verify", candidate],
+                    capture_output=True, timeout=5,
+                )
+                if chk.returncode == 0:
+                    upstream = candidate
+                    # origin/HEAD is symbolic, resolve to actual
+                    if candidate == "origin/HEAD":
+                        ref = subprocess.run(
+                            ["git", "-C", str(rice_dir), "symbolic-ref", "refs/remotes/origin/HEAD"],
+                            capture_output=True, text=True, timeout=5,
+                        )
+                        if ref.returncode == 0:
+                            upstream = ref.stdout.strip().replace("refs/remotes/", "")
+                    break
+
+        # Record pre-update hash for change detection
+        old_hash = subprocess.run(
+            ["git", "-C", str(rice_dir), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+
+        # Try hard reset to upstream if we found one, else fall back to pull --ff-only
+        updated = False
+        if upstream:
+            # origin/HEAD may be symbolic like origin/main, ensure we have the right name
+            reset = subprocess.run(
+                ["git", "-C", str(rice_dir), "reset", "--hard", upstream],
+                capture_output=True, text=True, timeout=30,
+            )
+            if reset.returncode == 0:
+                updated = True
+            else:
+                # fallback to pull with autostash
+                pull = subprocess.run(
+                    ["git", "-C", str(rice_dir), "pull", "--ff-only"],
+                    capture_output=True, text=True, timeout=30,
+                )
+                if pull.returncode == 0:
+                    updated = True
+                else:
+                    # last resort: pull --rebase --autostash
+                    pull2 = subprocess.run(
+                        ["git", "-C", str(rice_dir), "pull", "--rebase", "--autostash"],
+                        capture_output=True, text=True, timeout=30,
+                    )
+                    if pull2.returncode == 0:
+                        updated = True
+                    else:
+                        error_box("Rice", f"Update failed: {reset.stderr.strip() or pull.stderr.strip()}")
+                        # Try to restore stash
+                        if has_local_changes:
+                            subprocess.run(["git", "-C", str(rice_dir), "stash", "pop"], capture_output=True, timeout=10)
+                        return False
+        else:
+            # No upstream detected, try simple pull
+            pull = subprocess.run(
+                ["git", "-C", str(rice_dir), "pull", "--ff-only"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if pull.returncode == 0:
+                updated = True
+            else:
+                error_box("Rice", f"Update failed: {pull.stderr.strip()}")
+                if has_local_changes:
+                    subprocess.run(["git", "-C", str(rice_dir), "stash", "pop"], capture_output=True, timeout=10)
+                return False
+
+        new_hash = subprocess.run(
+            ["git", "-C", str(rice_dir), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+
+        if old_hash == new_hash:
+            success_box("Rice", f"'{rice_name}' already up to date")
+            # Drop stash if we created one and nothing changed (keep stash for manual recovery)
+            if has_local_changes:
+                # Keep autostash for user to review; try to pop if clean
+                # We leave stash as is to avoid losing local work; inform user
+                console.print("  [dim]Local changes were stashed as 'shadow-update autostash' — run 'git stash pop' to restore[/dim]")
+        else:
+            success_box("Rice", f"'{rice_name}' updated ({old_hash[:7]}..{new_hash[:7]})")
+            if has_local_changes:
+                console.print("  [warning]Local changes were stashed — review with 'git -C ~/.shadow-setup/dotfiles/rices/{0} stash list'[/warning]".format(rice_name))
+            # Re-apply if it's the active rice
+            if is_active(rice_name):
+                info_box("Rice", "Re-applying active rice...")
+                apply_rice_files(rice_dir)
+        return True
     except subprocess.TimeoutExpired:
         error_box("Rice", "Update timed out")
         return False

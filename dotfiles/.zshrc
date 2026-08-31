@@ -60,18 +60,39 @@ if [[ "$SHADOW_DISABLE_P10K" != "true" ]]; then
 fi
 
 # -----------------------------------------------
-# Autocomplete
+# Autocomplete — Global, agnóstico, pipe-aware
+#  Soporta tuberías (|), subcomandos y pipes encadenados
+#  sin depender de ningún RICE (100% agnóstico)
 # -----------------------------------------------
-ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
-ZSH_AUTOSUGGEST_STRATEGY=(history)
-ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
+# XDG fallback para Termux minimal
+[[ -z "${XDG_CACHE_HOME:-}" ]] && export XDG_CACHE_HOME="$HOME/.cache"
+[[ -d "$XDG_CACHE_HOME/zsh/compcache" ]] || mkdir -p "$XDG_CACHE_HOME/zsh/compcache"
+
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#4c566a'
+ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=30
+ZSH_AUTOSUGGEST_USE_ASYNC=true
+ZSH_AUTOSUGGEST_MANUAL_REBIND=1
 ZSH_AUTOSUGGEST_IGNORE_WIDGETS='expand-or-complete:*'
 
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path "$XDG_CACHE_HOME/zsh/compcache"
 zstyle ':completion:*' menu select
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+zstyle ':completion:*' rehash true
+zstyle ':completion:*' completer _complete _ignored _approximate
+zstyle ':completion:*' verbose true
+zstyle ':completion:*' squeeze-slashes true
+zstyle ':completion:*' accept-exact '*(N)'
+zstyle ':completion::complete:*' gain-privileges 1
+
+setopt ALWAYS_TO_END
+setopt AUTO_MENU
+setopt COMPLETE_IN_WORD
+setopt AUTO_LIST
+setopt AUTO_PARAM_SLASH
+setopt EXTENDED_GLOB
 
 # -----------------------------------------------
 # Environment

@@ -5,26 +5,36 @@
 # ================================================
 
 # -----------------------------------------------
-# zoxide
+# zoxide — shell-agnóstico (zsh / bash)
+#  Modular: inicializa el shell correcto, evita duplicar lógica en RICEs
 # -----------------------------------------------
 if command -v zoxide &>/dev/null; then
-    eval "$(zoxide init zsh)"
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        eval "$(zoxide init zsh)"
+    elif [[ -n "${BASH_VERSION:-}" ]]; then
+        eval "$(zoxide init bash)"
+    fi
     alias cd="z"
+    alias cdi="zi" 2>/dev/null || true
 fi
 
 # -----------------------------------------------
-# Aliases: ls → eza
+# Aliases: ls → eza (Nerd Fonts aware)
+#  --icons=auto: muestra iconos solo si la font los soporta (evita □)
+#  --color=auto: respeta pipes y NO_COLOR
 # -----------------------------------------------
 if command -v eza &>/dev/null; then
-    alias ls='eza --icons --group-directories-first --time-style=long-iso'
-    alias ll='eza -lah --icons --group-directories-first'
-    alias la='eza -a --icons --group-directories-first'
-    alias l='eza -lh --icons --group-directories-first'
-    alias lt='eza -T --icons --group-directories-first'
+    alias ls='eza --icons=auto --group-directories-first --color=auto --time-style=long-iso'
+    alias ll='eza -lah --icons=auto --group-directories-first --git --color=auto'
+    alias la='eza -a --icons=auto --group-directories-first --color=auto'
+    alias l='eza -lh --icons=auto --group-directories-first --color=auto'
+    alias lt='eza -T --icons=auto --group-directories-first --level=2 --color=auto'
+    alias lta='eza -Ta --icons=auto --group-directories-first --color=auto'
 else
-    alias ll='ls -lah'
-    alias la='ls -a'
-    alias l='ls -lh'
+    alias ls='ls --color=auto'
+    alias ll='ls -lah --color=auto'
+    alias la='ls -A --color=auto'
+    alias l='ls -lh --color=auto'
 fi
 
 # -----------------------------------------------
