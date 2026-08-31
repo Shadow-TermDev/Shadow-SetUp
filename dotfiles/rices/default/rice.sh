@@ -15,9 +15,9 @@ SHADOW_STARTUP_ANIM=true
 
 # TTS
 SHADOW_TTS_ENABLED=true
-SHADOW_TTS_LANG="es-US"
+SHADOW_TTS_LANG="en-US"
 SHADOW_TTS_RATE="1.0"
-SHADOW_TTS_MSG="Terminal lista"
+SHADOW_TTS_MSG="Terminal ready"
 
 # Environment
 export SHADOW_RICE="default"
@@ -40,9 +40,9 @@ fi
 if [[ "$SHADOW_TTS_ENABLED" == "true" ]] && command -v termux-tts-speak &>/dev/null; then
     nohup sh -c "
         h=\$(date +%H)
-        g='Buenas noches'
-        [ \"\$h\" -ge 6 ] && [ \"\$h\" -lt 12 ] && g='Buenos días'
-        [ \"\$h\" -ge 12 ] && [ \"\$h\" -lt 19 ] && g='Buenas tardes'
-        termux-tts-speak -l ${SHADOW_TTS_LANG} -r ${SHADOW_TTS_RATE} \"\${g}, terminal lista\"
+        g='Good evening'
+        [ \"\$h\" -ge 6 ] && [ \"\$h\" -lt 12 ] && g='Good morning'
+        [ \"\$h\" -ge 12 ] && [ \"\$h\" -lt 19 ] && g='Good afternoon'
+        termux-tts-speak -l ${SHADOW_TTS_LANG} -r ${SHADOW_TTS_RATE} \"\${g}, terminal ready\"
     " &>/dev/null &!
 fi
