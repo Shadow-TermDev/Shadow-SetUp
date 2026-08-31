@@ -303,6 +303,90 @@ def run_setup(rice_dir: Path) -> bool:
         return False
 
 
+def _selective_cleanup(rice_dir: Path, manifest: dict):
+    """Remove only files that the new rice will replace.
+
+    If new rice has font:false or no font.ttf, keep old font.
+    Same for colors, termux_properties, .p10k.zsh, etc.
+    """
+    if not INSTALLED_FILES_LOG.exists():
+        return
+
+    install_cfg = manifest.get("install", {})
+    custom_files = manifest.get("files", {})
+
+    # Build set of destinations that new rice WILL write
+    will_overwrite = set()
+
+    # File map destinations
+    file_map = dict(DEFAULT_FILE_MAP)
+    file_map.update(custom_files)
+    for src_name, dst_val in file_map.items():
+        src = rice_dir / src_name
+        if not src.exists():
+            continue
+        if dst_val == "active_rice.sh":
+            will_overwrite.add(str(ACTIVE_RICE_LINK))
+        elif dst_val == "aliases.sh":
+            will_overwrite.add(str(SHADOW_DATA / "aliases.sh"))
+        elif dst_val == "functions.sh":
+            will_overwrite.add(str(SHADOW_DATA / "functions.sh"))
+        elif dst_val.startswith("~/"):
+            will_overwrite.add(str(Path.home() / dst_val[2:]))
+        elif dst_val.startswith("/"):
+            will_overwrite.add(str(Path(dst_val)))
+        else:
+            will_overwrite.add(str(SHADOW_DATA / dst_val))
+
+    # Termux files (only if new rice provides them and manifest allows)
+    if install_cfg.get("colors", True) and (rice_dir / "colors.properties").exists():
+        will_overwrite.add(str(TERMUX_HOME / "colors.properties"))
+    if install_cfg.get("font", True) and (rice_dir / "font.ttf").exists():
+        will_overwrite.add(str(TERMUX_HOME / "font.ttf"))
+    if install_cfg.get("termux_properties", True) and (rice_dir / "termux.properties").exists():
+        will_overwrite.add(str(TERMUX_HOME / "termux.properties"))
+
+    # Extra dirs
+    SKIP_FILES = {"manifest.json", "setup.sh", "README.md", "LICENSE", "rices.sh", ".git", ".gitignore"}
+    SKIP_PREFIXES = (".",)
+    for item in rice_dir.iterdir():
+        if item.name in SKIP_FILES:
+            continue
+        if any(item.name.startswith(p) for p in SKIP_PREFIXES):
+            continue
+        if item.is_dir():
+            will_overwrite.add(str(SHADOW_DATA / item.name))
+
+    # Only delete tracked files that new rice will overwrite
+    try:
+        lines = INSTALLED_FILES_LOG.read_text().strip().split("\n")
+        remaining = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if line in will_overwrite:
+                dst = Path(line)
+                if dst.exists():
+                    if dst.is_file():
+                        dst.unlink()
+                    elif dst.is_dir():
+                        try:
+                            dst.rmdir()
+                        except OSError:
+                            pass
+            else:
+                remaining.append(line)
+
+        # Keep remaining tracked files
+        if remaining:
+            INSTALLED_FILES_LOG.write_text("\n".join(remaining) + "\n")
+        else:
+            INSTALLED_FILES_LOG.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
 def apply_rice_files(rice_dir: Path) -> bool:
     """Copy RICE files to their destinations based on manifest + defaults."""
     manifest = load_manifest(rice_dir)
@@ -310,9 +394,8 @@ def apply_rice_files(rice_dir: Path) -> bool:
     custom_files = manifest.get("files", {})
 
     try:
-        # CLEANUP previous rice files first
-        cleanup_previous_rice()
-        _clear_tracking()
+        # Selective cleanup: only remove files that new rice will replace
+        _selective_cleanup(rice_dir, manifest)
 
         # Build full file map: custom overrides > defaults
         file_map = dict(DEFAULT_FILE_MAP)
@@ -621,10 +704,11 @@ def delete_rice(rice_name: str) -> bool:
 
 
 def reset_rice_files() -> bool:
-    """Remove all rice-installed files without changing active rice."""
+    """Reset to default rice. If default not found, just clear active rice."""
     cleanup_previous_rice()
     _clear_tracking()
 
+    # Remove tracked termux/p10k files
     for f in ["colors.properties", "font.ttf", "termux.properties"]:
         p = TERMUX_HOME / f
         if p.exists():
@@ -634,10 +718,79 @@ def reset_rice_files() -> bool:
     if p10k.exists():
         p10k.unlink()
 
+    # Clear active rice
+    if ACTIVE_RICE_LINK.exists():
+        ACTIVE_RICE_LINK.unlink()
+
+    # Try to restore default rice if available
+    default_dir = RICES_DIR / "default"
+    if default_dir.exists() and (default_dir / "rice.sh").exists():
+        info_box("Rice", "Restoring default rice...")
+        if apply_rice_files(default_dir):
+            success_box("Rice", "Reset to default rice")
+            return True
+
+    # Fallback: copy base dotfiles
+    base_zshrc = SHADOW_DATA / "dotfiles" / ".zshrc"
+    if base_zshrc.exists():
+        shutil.copy2(base_zshrc, Path.home() / ".zshrc")
+
+    # Restore base termux config if available
+    for fname in ["colors.properties", "termux.properties"]:
+        src = SHADOW_DATA / "dotfiles" / ".termux" / fname
+        if src.exists():
+            TERMUX_HOME.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, TERMUX_HOME / fname)
+
     try:
         subprocess.run(["termux-reload-settings"], capture_output=True, timeout=5)
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
-    success_box("Rice", "All rice files cleaned up")
+    success_box("Rice", "Reset complete — no active rice")
     return True
+
+
+def update_rice(rice_name: str) -> bool:
+    """Update a rice from its git repo (if it has .git)."""
+    rice_dir = RICES_DIR / rice_name
+
+    if not rice_dir.exists():
+        error_box("Rice", f"'{rice_name}' not found")
+        return False
+
+    if not (rice_dir / ".git").exists():
+        manifest = load_manifest(rice_dir)
+        repo = manifest.get("repo", "")
+        if repo:
+            error_box("Rice", f"'{rice_name}' has no .git — reinstall: sw rice install {repo}")
+        else:
+            error_box("Rice", f"'{rice_name}' is a local rice (no git repo)")
+        return False
+
+    info_box("Rice", f"Updating '{rice_name}'...")
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(rice_dir), "pull", "--ff-only"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            if "Already up to date" in output or "Already up-to-date" in output:
+                success_box("Rice", f"'{rice_name}' already up to date")
+            else:
+                success_box("Rice", f"'{rice_name}' updated")
+                # Re-apply if it's the active rice
+                if is_active(rice_name):
+                    info_box("Rice", "Re-applying active rice...")
+                    apply_rice_files(rice_dir)
+            return True
+        else:
+            error_box("Rice", f"Update failed: {result.stderr.strip()}")
+            return False
+    except subprocess.TimeoutExpired:
+        error_box("Rice", "Update timed out")
+        return False
+    except Exception as e:
+        error_box("Rice", f"Update failed: {e}")
+        return False

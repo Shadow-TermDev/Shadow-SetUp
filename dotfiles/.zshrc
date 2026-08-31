@@ -23,10 +23,23 @@ setopt HIST_VERIFY
 setopt NO_BEEP
 
 # -----------------------------------------------
+# RICE early load — lets rice set SHADOW_DISABLE_P10K=true
+# -----------------------------------------------
+SHADOW_RICE_EARLY="$HOME/.shadow-setup/active_rice.sh"
+[ -f "$SHADOW_RICE_EARLY" ] && source "$SHADOW_RICE_EARLY" 2>/dev/null || true
+
+# -----------------------------------------------
 # Oh My Zsh
 # -----------------------------------------------
-ZSH_THEME="powerlevel10k/powerlevel10k"
+if [[ "$SHADOW_DISABLE_P10K" == "true" ]]; then
+    ZSH_THEME=""
+else
+    ZSH_THEME="powerlevel10k/powerlevel10k"
+fi
 export ZSH="/data/data/com.termux/files/home/.oh-my-zsh"
+
+# Suppress p10k wizard when no config exists (e.g. custom-prompt rices)
+[[ ! -f ~/.p10k.zsh ]] && typeset -g POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
 
 # Auto-detect installed plugins
 _zsh_plugins=()
@@ -38,8 +51,10 @@ unset _p _zsh_plugins
 
 source $ZSH/oh-my-zsh.sh
 
-# Powerlevel10k config
-[[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+# Powerlevel10k config (only if not disabled)
+if [[ "$SHADOW_DISABLE_P10K" != "true" ]]; then
+    [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+fi
 
 # -----------------------------------------------
 # Autocomplete

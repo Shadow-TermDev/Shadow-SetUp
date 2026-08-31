@@ -6,13 +6,14 @@ class RiceCommand(Command):
     name = "rice"
     aliases = []
     description = "Manage RICE themes"
-    usage = "rice [list|set|install|delete|backup|check|reset]"
+    usage = "rice [list|set|install|delete|backup|check|reset|update]"
     examples = [
         "rice                 # List RICEs",
         "rice list            # List available RICEs",
         "rice set kawaii      # Activate kawaii RICE",
         "rice set kawaii -f   # Force reinstall RICE",
-        "rice reset           # Clean all rice files",
+        "rice update nordic   # Update rice from git",
+        "rice reset           # Reset to default rice",
         "rice check           # Show active RICE",
     ]
     tui_label = "[6] Manage RICEs"
@@ -25,9 +26,10 @@ class RiceCommand(Command):
         "set":     "Set active RICE",
         "check":   "Show active RICE",
         "install": "Install RICE from git",
+        "update":  "Update RICE from git",
         "delete":  "Delete a local RICE",
         "backup":  "Backup current RICE",
-        "reset":   "Clean all rice-installed files",
+        "reset":   "Reset to default rice",
     }
 
     def execute(self, args: list[str] = None) -> None:
@@ -56,8 +58,12 @@ class RiceCommand(Command):
             self._rice_check()
         elif subcmd == "reset":
             self._rice_reset()
+        elif subcmd == "update" and subargs:
+            self._rice_update(subargs[0])
+        elif subcmd == "update":
+            self._rice_update_all()
         else:
-            error_box("Error", "Usage: rice [list|set|install|delete|backup|check|reset] [args]")
+            error_box("Error", "Usage: rice [list|set|install|delete|backup|check|reset|update] [args]")
 
     def _rice_list(self) -> None:
         from _lib.utils.ui import console, banner
@@ -138,3 +144,20 @@ class RiceCommand(Command):
         from _lib.utils.rice_manager import reset_rice_files
         banner()
         reset_rice_files()
+
+    def _rice_update(self, rice_name: str) -> None:
+        from _lib.utils.ui import banner
+        from _lib.utils.rice_manager import update_rice
+        banner()
+        update_rice(rice_name)
+
+    def _rice_update_all(self) -> None:
+        from _lib.utils.ui import banner, console
+        from _lib.utils.rice_manager import list_local_rices, update_rice
+        banner()
+        local = list_local_rices()
+        if not local:
+            console.print("[dim]No RICEs installed[/dim]")
+            return
+        for rice in local:
+            update_rice(rice["name"])
