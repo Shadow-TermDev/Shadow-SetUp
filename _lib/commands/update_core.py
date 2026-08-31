@@ -85,6 +85,28 @@ class UpdateCoreCommand(Command):
                     # Also sync base aliases if needed (kept in dotfiles, sourced by .zshrc)
                     # No need to copy to home, just ensure dotfiles version is fresh
 
+                # Preserve local dev fixes if remote is outdated (avoid downgrade)
+                # This handles the case where local Shadow-SetUp has agnostic fixes but remote hasn't been pushed yet
+                try:
+                    local_dev = Path.home() / "Shadow-SetUp"
+                    local_zshrc = local_dev / "dotfiles" / ".zshrc"
+                    if local_dev.exists() and local_zshrc.exists():
+                        local_content = local_zshrc.read_text()
+                        dst_zshrc_path = dotfiles_dst / ".zshrc"
+                        dst_content = dst_zshrc_path.read_text() if dst_zshrc_path.exists() else ""
+                        if "history completion" in local_content and "history completion" not in dst_content:
+                            console.print("  [warning]Remote outdated — preserving local .zshrc fix[/warning]")
+                            shutil.copy2(local_zshrc, dst_zshrc_path)
+                            shutil.copy2(local_zshrc, Path.home() / ".zshrc")
+                        local_alias = local_dev / "dotfiles" / "aliases.sh"
+                        if local_alias.exists():
+                            dst_alias = dotfiles_dst / "aliases.sh"
+                            if dst_alias.exists():
+                                if "--icons=auto" in local_alias.read_text() and "--icons=auto" not in dst_alias.read_text():
+                                    shutil.copy2(local_alias, dst_alias)
+                except Exception:
+                    pass
+
                 # Copy .version
                 version_src = temp_dir / ".version"
                 version_dst = SHADOW_DATA / ".version"
