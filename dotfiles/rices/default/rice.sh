@@ -46,3 +46,12 @@ if [[ "$SHADOW_TTS_ENABLED" == "true" ]] && command -v termux-tts-speak &>/dev/n
         termux-tts-speak -l ${SHADOW_TTS_LANG} -r ${SHADOW_TTS_RATE} \"\${g}, terminal ready\"
     " &>/dev/null &!
 fi
+
+# ── Cargar alias/funciones del RICE de forma agnóstica ──
+# Hace que active_rice.sh siempre registre la/ll aunque el RICE no haga source explícito
+RICE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" 2>/dev/null && pwd || cd "$(dirname "$0")" && pwd)"
+[ -f "$RICE_SCRIPT_DIR/aliases.sh" ] && source "$RICE_SCRIPT_DIR/aliases.sh"
+[ -f "$RICE_SCRIPT_DIR/functions.sh" ] && source "$RICE_SCRIPT_DIR/functions.sh"
+if ! alias ls &>/dev/null; then
+    [ -f "$HOME/.shadow-setup/aliases.sh" ] && source "$HOME/.shadow-setup/aliases.sh"
+fi

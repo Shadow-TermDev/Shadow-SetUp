@@ -22,14 +22,15 @@ fi
 # Aliases: ls → eza (Nerd Fonts aware)
 #  --icons=auto: muestra iconos solo si la font los soporta (evita □)
 #  --color=auto: respeta pipes y NO_COLOR
+#  Funciones aseguran que `eza` sin args liste "." (fix eza 0.23.5)
 # -----------------------------------------------
 if command -v eza &>/dev/null; then
-    alias ls='eza --icons=auto --group-directories-first --color=auto --time-style=long-iso'
-    alias ll='eza -lah --icons=auto --group-directories-first --git --color=auto'
-    alias la='eza -a --icons=auto --group-directories-first --color=auto'
-    alias l='eza -lh --icons=auto --group-directories-first --color=auto'
-    alias lt='eza -T --icons=auto --group-directories-first --level=2 --color=auto'
-    alias lta='eza -Ta --icons=auto --group-directories-first --color=auto'
+    ls() { if [ $# -eq 0 ]; then eza --icons=auto --group-directories-first --color=auto --time-style=long-iso .; else eza --icons=auto --group-directories-first --color=auto --time-style=long-iso "$@"; fi; }
+    ll() { if [ $# -eq 0 ]; then eza -lah --icons=auto --group-directories-first --git --color=auto .; else eza -lah --icons=auto --group-directories-first --git --color=auto "$@"; fi; }
+    la() { if [ $# -eq 0 ]; then eza -a --icons=auto --group-directories-first --color=auto .; else eza -a --icons=auto --group-directories-first --color=auto "$@"; fi; }
+    l() { if [ $# -eq 0 ]; then eza -lh --icons=auto --group-directories-first --color=auto .; else eza -lh --icons=auto --group-directories-first --color=auto "$@"; fi; }
+    lt() { eza -T --icons=auto --group-directories-first --level=2 --color=auto "${@:-.}"; }
+    lta() { eza -Ta --icons=auto --group-directories-first --color=auto "${@:-.}"; }
 else
     alias ls='ls --color=auto'
     alias ll='ls -lah --color=auto'

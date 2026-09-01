@@ -183,6 +183,32 @@ export SHADOW_RICE="my-rice"
 export BAT_THEME="Monokai Extended"
 ```
 
+### TTS sin job control y alias agnósticos
+
+Para que `la`/`ll`/`ls` (eza) siempre se registren y el TTS no imprima `[3] 24248` en el startup, añade al final de **cada** `rice.sh`:
+
+```bash
+# ── TTS sin job control (no imprime "[3] 24248") ──
+if [[ "${SHADOW_TTS_ENABLED}" == "true" ]] && command -v termux-tts-speak &>/dev/null; then
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    ( _h=$(date +%H); _g="Good evening"; (( _h >= 6 && _h < 12 )) && _g="Good morning"; (( _h >= 12 && _h < 19 )) && _g="Good afternoon"; termux-tts-speak -l "${SHADOW_TTS_LANG}" -r "${SHADOW_TTS_RATE}" "${_g}, ${SHADOW_TTS_MSG}" 2>/dev/null ) >/dev/null 2>&1 &! 2>/dev/null || true
+  else
+    nohup bash -c '_h=$(date +%H); _g="Good evening"; [ "$_h" -ge 6 ] && [ "$_h" -lt 12 ] && _g="Good morning"; [ "$_h" -ge 12 ] && [ "$_h" -lt 19 ] && _g="Good afternoon"; termux-tts-speak -l "'"${SHADOW_TTS_LANG}"'" -r "'"${SHADOW_TTS_RATE}"'" "${_g}, '"${SHADOW_TTS_MSG}"'" 2>/dev/null' >/dev/null 2>&1 & disown 2>/dev/null || true
+  fi
+fi
+
+# ── Cargar alias/funciones del RICE de forma agnóstica ──
+# Hace que active_rice.sh (copia de rice.sh) siempre registre ls/la/ll/tree
+RICE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" 2>/dev/null && pwd || cd "$(dirname "$0")" && pwd)"
+[ -f "$RICE_SCRIPT_DIR/aliases.sh" ] && source "$RICE_SCRIPT_DIR/aliases.sh"
+[ -f "$RICE_SCRIPT_DIR/functions.sh" ] && source "$RICE_SCRIPT_DIR/functions.sh"
+if ! alias ls &>/dev/null; then
+  [ -f "$HOME/.shadow-setup/aliases.sh" ] && source "$HOME/.shadow-setup/aliases.sh"
+fi
+```
+
+Esto es el fix oficial para `nordic` y los rices `default`/`kawaii`/`term-shadow`. Si tu RICE no trae `aliases.sh`, el fallback carga los globales de `~/.shadow-setup/aliases.sh`. Incluir `font.ttf` con `install.font:true` en `manifest.json` evita verificar fuentes (como `term-shadow`).
+
 ## Managing RICEs
 
 ```bash
