@@ -18,24 +18,26 @@ if command -v zoxide &>/dev/null; then
     alias cdi="zi" 2>/dev/null || true
 fi
 
-# -----------------------------------------------
-# Aliases: ls → eza (Nerd Fonts aware)
-#  --icons=auto: muestra iconos solo si la font los soporta (evita □)
-#  --color=auto: respeta pipes y NO_COLOR
-#  Funciones aseguran que `eza` sin args liste "." (fix eza 0.23.5)
-# -----------------------------------------------
+# ================================================
+# Aliases globales / RICE
+# ================================================
+
+# Eliminar alias o funciones previas de ls para evitar conflictos
+unalias ls 2>/dev/null || true
+unalias ll 2>/dev/null || true
+unalias la 2>/dev/null || true
+
 if command -v eza &>/dev/null; then
-    ls() { if [ $# -eq 0 ]; then eza --icons=auto --group-directories-first --color=auto --time-style=long-iso .; else eza --icons=auto --group-directories-first --color=auto --time-style=long-iso "$@"; fi; }
-    ll() { if [ $# -eq 0 ]; then eza -lah --icons=auto --group-directories-first --git --color=auto .; else eza -lah --icons=auto --group-directories-first --git --color=auto "$@"; fi; }
-    la() { if [ $# -eq 0 ]; then eza -a --icons=auto --group-directories-first --color=auto .; else eza -a --icons=auto --group-directories-first --color=auto "$@"; fi; }
-    l() { if [ $# -eq 0 ]; then eza -lh --icons=auto --group-directories-first --color=auto .; else eza -lh --icons=auto --group-directories-first --color=auto "$@"; fi; }
-    lt() { eza -T --icons=auto --group-directories-first --level=2 --color=auto "${@:-.}"; }
-    lta() { eza -Ta --icons=auto --group-directories-first --color=auto "${@:-.}"; }
+    alias ls='eza --icons=auto --group-directories-first'
+    alias ll='eza -la --icons=auto --octal-permissions --group-directories-first'
+    alias la='eza -a --icons=auto --group-directories-first'
+    alias l='eza -lh --icons=auto --group-directories-first'
+    alias tree='eza --tree --icons=auto'
 else
     alias ls='ls --color=auto'
-    alias ll='ls -lah --color=auto'
-    alias la='ls -A --color=auto'
-    alias l='ls -lh --color=auto'
+    alias ll='ls -lah'
+    alias la='ls -a'
+    alias l='ls -lh'
 fi
 
 # -----------------------------------------------
