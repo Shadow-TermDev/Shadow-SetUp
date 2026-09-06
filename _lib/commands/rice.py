@@ -68,29 +68,84 @@ class RiceCommand(Command):
     def _rice_list(self) -> None:
         from _lib.utils.ui import console, banner
         from _lib.utils.rice_manager import fetch_official_rices, list_local_rices, get_active_rice
+        from pathlib import Path
 
         banner()
         official = fetch_official_rices()
         local = list_local_rices()
         local_names = {r["name"] for r in local}
+        # Mapa nombre manifest -> dir para resolver alias nordic <-> nordic-rice-termux
+        manifest_to_dir = {}
+        for r in local:
+            mname = r["manifest"].get("name")
+            if mname:
+                manifest_to_dir[mname] = r["name"]
         active = get_active_rice()
+
+        def _is_active(official_key: str) -> bool:
+            if official_key == active:
+                return True
+            # alias manifest.name
+            if manifest_to_dir.get(official_key) == active:
+                return True
+            # reverse: active es manifest.name
+            for r in local:
+                if r["name"] == active and r["manifest"].get("name") == official_key:
+                    return True
+                if r["name"] == official_key and r["manifest"].get("name") == active:
+                    return True
+            return False
 
         console.print("[bold]Official RICEs:[bold]")
         for name, info in sorted(official.items()):
-            installed = " [dim]+installed[/dim]" if name in local_names else ""
-            marker = " [green]*[/green]" if name == active else ""
-            console.print(f"  [cyan]{name}[/cyan]{marker}{installed} — {info.get('description', '')}")
+            installed = name in local_names or manifest_to_dir.get(name) in local_names
+            installed_str = " [dim]+installed[/dim]" if installed else ""
+            marker = " [green]*[/green]" if _is_active(name) else ""
+            # tag externo vs bundled
+            tag = ""
+            if info.get("external"):
+                tag = " [dim](external)[/dim]"
+            elif info.get("local"):
+                tag = ""
+            desc = info.get("description", "")
+            # Si tiene repo, mostrar hint
+            console.print(f"  [cyan]{name}[/cyan]{marker}{installed_str}{tag} — {desc}")
 
-        if local:
+        # Local = community/custom (no están en official ni via alias)
+        # Pero mostrar todos los custom con etiqueta
+        custom = []
+        for rice in local:
+            is_official = rice["name"] in official or rice["manifest"].get("name") in official
+            # También considerar external repo match
+            if not is_official:
+                # check if any official repo maps to this dir name
+                for k, v in official.items():
+                    repo = v.get("repo", "")
+                    if repo and (repo.rstrip("/").endswith(f"/{rice['name']}") or repo.rstrip("/").endswith(f"/{rice['name']}.git") or k == rice["manifest"].get("name")):
+                        is_official = True
+                        break
+            if not is_official:
+                custom.append(rice)
+
+        if custom:
             console.print()
-            console.print("[bold]Local RICEs:[bold]")
-            for rice in local:
-                if rice["name"] not in official:
-                    marker = " [green]*[/green]" if rice["name"] == active else ""
-                    console.print(f"  [cyan]{rice['name']}[/cyan]{marker}")
+            console.print("[bold]Community / Local RICEs:[bold]")
+            for rice in custom:
+                marker = " [green]*[/green]" if rice["name"] == active or rice["manifest"].get("name") == active else ""
+                # Detectar source meta
+                meta_path = Path(rice["path"]).parent / f".{rice['name']}.meta.json" if False else None
+                # mostrar descripción del manifest si existe
+                desc = rice["manifest"].get("description", "")
+                desc_str = f" — {desc}" if desc else ""
+                console.print(f"  [cyan]{rice['name']}[/cyan]{marker} [dim](community)[/dim]{desc_str}")
+        elif not custom and local:
+            # Todos son oficiales, mostrar sección local informativa pero vacía
+            console.print()
+            console.print("[dim]Local RICEs: todos los instalados son oficiales (ver arriba).[/dim]")
+            console.print("[dim]Community rices instalados vía [cyan]sw rice install <url>[/cyan] aparecerán aquí.[/dim]")
 
         console.print()
-        console.print("[dim]* = active | + = downloaded[/dim]")
+        console.print("[dim]* = active | + = downloaded | (external) = repo aparte[/dim]")
 
     def _rice_set(self, rice_name: str, force: bool = False) -> None:
         from _lib.utils.ui import banner
@@ -133,7 +188,7 @@ class RiceCommand(Command):
             console.print()
             console.print("[bold]Installed RICEs:[bold]")
             for rice in local:
-                marker = " [green]*[/green]" if rice["name"] == active else ""
+                marker = " [green]*[/green]" if rice["name"] == active or rice["manifest"].get("name") == active else ""
                 console.print(f"  [cyan]{rice['name']}[/cyan]{marker}")
         else:
             console.print()

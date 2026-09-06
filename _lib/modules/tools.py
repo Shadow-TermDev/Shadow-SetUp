@@ -2,7 +2,7 @@
 
 import subprocess
 from _lib.modules import BaseModule
-from _lib.utils import run_cmd, pkg_installed
+from _lib.utils import pkg_installed_many
 from _lib.utils.ui import console, success_box, error_box, info_box
 
 class ToolsModule(BaseModule):
@@ -18,6 +18,7 @@ class ToolsModule(BaseModule):
     
     def install(self) -> bool:
         try:
+            from _lib.utils import pkg_installed, run_cmd
             info_box("Installing tools", f"{len(self.PACKAGES)} packages")
             
             installed = 0
@@ -49,6 +50,7 @@ class ToolsModule(BaseModule):
     
     def update(self) -> bool:
         try:
+            from _lib.utils import run_cmd
             info_box("Updating tools", "Running pkg update...")
             run_cmd(["pkg", "update", "-y"], capture=True, timeout=300)
             run_cmd(["pkg", "upgrade", "-y"], capture=True, timeout=300)
@@ -65,7 +67,8 @@ class ToolsModule(BaseModule):
             return False
     
     def status(self) -> dict:
-        missing = [p for p in self.PACKAGES if not pkg_installed(p)]
+        results = pkg_installed_many(self.PACKAGES)
+        missing = [p for p, ok in results.items() if not ok]
         return {
             "status": "ok" if not missing else "partial",
             "details": f"{len(self.PACKAGES) - len(missing)}/{len(self.PACKAGES)} installed"

@@ -53,6 +53,19 @@ RICES_REPO_BASE = "https://github.com/Shadow-TermDev/rices"
 TERMUX_HOME = Path.home() / ".termux"
 SHADOW_BIN = Path.home() / ".local" / "bin"
 
+# Fallback si manifest.json falta o está corrupto (no usar escaneo de dirs como oficial)
+OFFICIAL_FALLBACK = {
+    "default": {"description": "Clean, minimal Ocean theme — blue/white, Fira Code", "local": True},
+    "kawaii": {"description": "Cute Pink Neon theme — magenta/pink, Hack Nerd Font", "local": True},
+    "term-shadow": {"description": "Personal theme — argonaut colors, JetBrains Mono", "local": True},
+    "nordic-rice-termux": {
+        "description": "Nord-inspired theme — Polar Night, Snow Storm, Frost & Aurora. Minimal p10k + fastfetch/neofetch.",
+        "repo": "https://github.com/Shadow-TermDev/nordic-rice-termux",
+        "local": False,
+        "external": True,
+    },
+}
+
 # Default file mappings (when manifest doesn't specify "files")
 DEFAULT_FILE_MAP = {
     "rice.sh": "active_rice.sh",
@@ -121,34 +134,75 @@ def load_manifest(rice_dir: Path) -> dict:
 
 
 def fetch_official_rices() -> dict:
-    """Fetch official RICEs from manifest (local only)."""
-    local_manifest = Path(__file__).parent.parent.parent / "dotfiles" / "rices" / "manifest.json"
-    if local_manifest.exists():
-        try:
-            data = json.loads(local_manifest.read_text())
-            return data.get("official_rices", {})
-        except Exception:
-            pass
+    """Fetch official RICEs from manifest (robusto vs corrupción).
 
-    installed_manifest = RICES_DIR / "manifest.json"
-    if installed_manifest.exists():
-        try:
-            data = json.loads(installed_manifest.read_text())
-            return data.get("official_rices", {})
-        except Exception:
-            pass
+    Orden:
+      1. Repo local (Shadow-SetUp/dotfiles/rices/manifest.json) — si existe y es JSON válido
+      2. Instalado (~/.shadow-setup/dotfiles/rices/manifest.json) — con auto-reparación si contiene markdown
+      3. OFFICIAL_FALLBACK (nunca escanear dirs como oficiales)
 
-    rices = {}
-    if RICES_DIR.exists():
-        for rice_dir in sorted(RICES_DIR.iterdir()):
-            if rice_dir.is_dir():
-                manifest = load_manifest(rice_dir)
-                if manifest or (rice_dir / "rice.sh").exists():
-                    rices[rice_dir.name] = {
-                        "description": manifest.get("description", ""),
-                        "local": True,
-                    }
-    return rices
+    Los RICE instalados vía `sw rice install <url>` (ej. nordic-rice-termux) NO aparecen como oficiales
+    a menos que estén listados explícitamente en el manifest. El caso nordic-rice-termux SÍ es oficial
+    externo (external:true) y está en el manifest oficial.
+    """
+    candidates = [
+        Path(__file__).parent.parent.parent / "dotfiles" / "rices" / "manifest.json",
+        # También probar path del repo en HOME (modo dev)
+        Path.home() / "Shadow-SetUp" / "dotfiles" / "rices" / "manifest.json",
+        RICES_DIR / "manifest.json",
+    ]
+    for p in candidates:
+        if not p.exists():
+            continue
+        try:
+            text = p.read_text()
+            stripped = text.lstrip()
+            # Detectar corrupción: archivo contiene guía markdown en vez de JSON
+            if stripped.startswith("#") or stripped.startswith("```") or '"official_rices"' not in stripped[:2000]:
+                # Si es el manifest instalado corrupto, auto-reparar desde repo
+                if p == RICES_DIR / "manifest.json":
+                    for src in candidates:
+                        if src == p:
+                            continue
+                        if src.exists():
+                            try:
+                                src_text = src.read_text().lstrip()
+                                if src_text.startswith("{") and '"official_rices"' in src_text:
+                                    p.write_text(src.read_text())
+                                    data = json.loads(src.read_text())
+                                    return data.get("official_rices", OFFICIAL_FALLBACK)
+                            except Exception:
+                                continue
+                    # Fallback si no hay fuente válida
+                    warning_box("Rice", f"manifest.json corrupto en {p} — usando fallback oficial")
+                    continue
+                else:
+                    continue
+            data = json.loads(text)
+            if "official_rices" in data:
+                return data.get("official_rices", {})
+        except Exception:
+            continue
+
+    return dict(OFFICIAL_FALLBACK)
+
+
+def is_official_rice(rice_name: str) -> bool:
+    """Check if a rice is official (in manifest). Handles manifest name alias."""
+    official = fetch_official_rices()
+    if rice_name in official:
+        return True
+    # También considerar manifest.name alias (ej. dir nordic-rice-termux con manifest.name=nordic)
+    rice_dir = RICES_DIR / rice_name
+    if rice_dir.exists():
+        m = load_manifest(rice_dir)
+        if m.get("name") and m.get("name") in official:
+            return True
+        # Reverse: buscar si algún oficial apunta a este dir via repo name
+        for k, v in official.items():
+            if v.get("repo", "").rstrip("/").endswith(f"/{rice_name}") or v.get("repo", "").rstrip("/").endswith(f"/{rice_name}.git"):
+                return True
+    return False
 
 
 def list_local_rices() -> list[dict]:
@@ -158,6 +212,12 @@ def list_local_rices() -> list[dict]:
 
     for rice_dir in sorted(RICES_DIR.iterdir()):
         if rice_dir.is_dir():
+            # Ignorar manifest.json si fuera archivo (ya no, pero por seguridad)
+            if rice_dir.name == "manifest.json":
+                continue
+            # Solo considerar directorios que son rices (tienen manifest o rice.sh)
+            if not ((rice_dir / "manifest.json").exists() or (rice_dir / "rice.sh").exists()):
+                continue
             manifest = load_manifest(rice_dir)
             rices.append({
                 "name": rice_dir.name,
@@ -165,6 +225,7 @@ def list_local_rices() -> list[dict]:
                 "has_script": (rice_dir / "rice.sh").exists(),
                 "active": is_active(rice_dir.name),
                 "manifest": manifest,
+                "is_official": is_official_rice(rice_dir.name),
             })
 
     return rices
@@ -619,13 +680,14 @@ fi
 
 
 def download_rice(rice_name: str, rice_info: dict) -> bool:
-    """Download a RICE from GitHub (or copy if local)."""
+    """Download a RICE from GitHub (or copy if local/external)."""
     ensure_dirs()
 
     rice_dir = RICES_DIR / rice_name
     if rice_dir.exists() and ((rice_dir / "rice.sh").exists() or (rice_dir / "manifest.json").exists()):
         return True
 
+    # Oficial local (bundled)
     if rice_info.get("local"):
         possible_paths = [
             Path(__file__).parent.parent.parent / "dotfiles" / "rices" / rice_name,
@@ -639,7 +701,34 @@ def download_rice(rice_name: str, rice_info: dict) -> bool:
         error_box("Rice", f"Local RICE '{rice_name}' not found")
         return False
 
-    # Remote RICEs — clone from git
+    # Oficial externo con repo (ej. nordic-rice-termux)
+    if rice_info.get("repo") or rice_info.get("url"):
+        url = rice_info.get("repo") or rice_info.get("url")
+        try:
+            result = subprocess.run(
+                ["git", "clone", "--depth=1", url, str(rice_dir)],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                error_box("Rice", f"Clone failed: {result.stderr.strip()}")
+                return False
+            has_rice_sh = (rice_dir / "rice.sh").exists()
+            has_manifest = (rice_dir / "manifest.json").exists()
+            if not has_rice_sh and not has_manifest:
+                error_box("Rice", "No rice.sh or manifest.json found in repository")
+                shutil.rmtree(rice_dir)
+                return False
+            return True
+        except subprocess.TimeoutExpired:
+            error_box("Rice", "Download timed out")
+            return False
+        except Exception as e:
+            error_box("Rice", f"Download failed: {e}")
+            if rice_dir.exists():
+                shutil.rmtree(rice_dir, ignore_errors=True)
+            return False
+
+    # Remote RICEs genérico — clone sparse (legacy)
     url = rice_info.get("url", RICES_REPO_BASE)
     path = rice_info.get("path", rice_name)
     temp_dir = RICES_DIR / f".tmp_{rice_name}"
@@ -737,9 +826,28 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = False, force: bo
 
     if rice_name in official:
         rice_info = official[rice_name]
+        # Si el nombre no está en oficial pero su manifest.name sí lo está, resolver alias
+        # (ej. manifest.name == "nordic" pero dir == "nordic-rice-termux")
+        if rice_name not in official:
+            for k, v in official.items():
+                m = load_manifest(rice_dir) if rice_dir.exists() else {}
+                if m.get("name") == k:
+                    rice_info = v
+                    break
     else:
-        error_box("Rice", f"'{rice_name}' not found. Use 'sw rice install <url>' for custom RICEs.")
-        return False
+        # Buscar alias por manifest.name (nordic -> nordic-rice-termux)
+        found_alias = None
+        for k, v in official.items():
+            # Si el rice_name coincide con el manifest.name de un oficial ya instalado
+            for local in list_local_rices():
+                if local["name"] == rice_name and local["manifest"].get("name") == k:
+                    found_alias = v
+                    break
+        if found_alias:
+            rice_info = found_alias
+        else:
+            error_box("Rice", f"'{rice_name}' not found. Use 'sw rice install <url>' for custom RICEs.")
+            return False
 
     console.print(f"  [cyan]Downloading '{rice_name}'...[/cyan]")
     if not download_rice(rice_name, rice_info):
@@ -773,11 +881,20 @@ def install_custom_rice(git_url: str) -> bool:
     repo_name = git_url.rstrip("/").split("/")[-1].replace(".git", "")
     rice_dir = RICES_DIR / repo_name
 
+    # Marcar como community si no es oficial externo conocido
+    official = fetch_official_rices()
+    is_known_official = any(
+        (v.get("repo", "") or v.get("url", "")).rstrip("/").endswith(f"/{repo_name}") or
+        (v.get("repo", "") or v.get("url", "")).rstrip("/").endswith(f"/{repo_name}.git") or
+        k == repo_name
+        for k, v in official.items()
+    )
+
     if rice_dir.exists():
         warning_box("Rice", f"'{repo_name}' already exists, updating...")
         try:
             subprocess.run(["git", "-C", str(rice_dir), "pull"], capture_output=True, check=True)
-            success_box("Rice", f"'{repo_name}' updated")
+            success_box("Rice", f"'{repo_name}' updated" + (" (official external)" if is_known_official else " (community)"))
             return True
         except Exception as e:
             error_box("Rice", f"Update failed: {e}")
@@ -800,7 +917,17 @@ def install_custom_rice(git_url: str) -> bool:
             shutil.rmtree(rice_dir)
             return False
 
-        success_box("Rice", f"'{repo_name}' installed")
+        # Guardar metadata de origen para distinguir community vs official
+        try:
+            meta = RICES_DIR / f".{repo_name}.meta.json"
+            meta.write_text(json.dumps({"url": git_url, "source": "official" if is_known_official else "community"}))
+        except Exception:
+            pass
+
+        label = "official external" if is_known_official else "community"
+        success_box("Rice", f"'{repo_name}' installed ({label})")
+        if is_known_official:
+            console.print(f"[dim]Tip: ahora aparece en Official RICEs. Actívalo con [cyan]sw rice set {repo_name}[/cyan][/dim]")
         return True
 
     except subprocess.TimeoutExpired:
@@ -825,6 +952,10 @@ def delete_rice(rice_name: str) -> bool:
 
     try:
         shutil.rmtree(rice_dir)
+        # Limpiar meta si existe
+        meta = RICES_DIR / f".{rice_name}.meta.json"
+        if meta.exists():
+            meta.unlink()
         success_box("Rice", f"'{rice_name}' deleted")
         return True
     except Exception as e:

@@ -3,7 +3,6 @@
 import os
 import sys
 import shutil
-import pyfiglet
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -55,20 +54,30 @@ def get_zoom_level() -> str:
     else:
         return "small"
 
+# Cache banner so pyfiglet not regenerated every help call ( ~23ms saved)
+_BANNER_CACHE: dict[str, str] = {}
+
 def banner():
-    """Display Shadow-SetUp banner using pyfiglet with adaptive size."""
+    """Display Shadow-SetUp banner using pyfiglet with adaptive size (lazy import)."""
     width = get_terminal_width()
     zoom = get_zoom_level()
+    cache_key = f"{zoom}:{width}"
 
-    try:
-        if zoom == "large":
-            ascii_art = pyfiglet.figlet_format("Shadow-SetUp", font="slant")
-        elif zoom == "medium":
-            ascii_art = pyfiglet.figlet_format("Shadow", font="small")
-        else:
-            ascii_art = pyfiglet.figlet_format("SS", font="small")
-    except Exception:
-        ascii_art = "Shadow-SetUp"
+    if cache_key in _BANNER_CACHE:
+        ascii_art = _BANNER_CACHE[cache_key]
+    else:
+        try:
+            import pyfiglet  # lazy: no importar al inicio (ahorra ~180ms cold start si no se usa)
+            if zoom == "large":
+                ascii_art = pyfiglet.figlet_format("Shadow-SetUp", font="slant")
+            elif zoom == "medium":
+                ascii_art = pyfiglet.figlet_format("Shadow", font="small")
+            else:
+                ascii_art = pyfiglet.figlet_format("SS", font="small")
+            _BANNER_CACHE[cache_key] = ascii_art
+        except Exception:
+            ascii_art = "Shadow-SetUp"
+            _BANNER_CACHE[cache_key] = ascii_art
 
     for line in ascii_art.rstrip().split("\n"):
         console.print(Align.center(f"[bold cyan]{rich_escape(line)}[/bold cyan]"))

@@ -11,6 +11,12 @@
     "term-shadow": {
       "description": "Personal theme — argonaut colors, JetBrains Mono",
       "local": true
+    },
+    "nordic-rice-termux": {
+      "description": "Nord-inspired theme — Polar Night, Snow Storm, Frost & Aurora. Minimal p10k + fastfetch/neofetch.",
+      "repo": "https://github.com/Shadow-TermDev/nordic-rice-termux",
+      "local": false,
+      "external": true
     }
   }
 }
