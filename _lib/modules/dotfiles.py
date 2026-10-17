@@ -7,12 +7,16 @@ from _lib.modules import BaseModule
 from _lib.utils import backup_file, run_cmd, TERMUX_HOME, SHADOW_DATA, SHADOW_CACHE, OH_MY_ZSH
 from _lib.utils.ui import console, success_box, error_box, info_box, warning_box
 
-# Marker used to tell the framework .zshrc apart from a foreign one (OMZ/p10k)
-ZSHRC_MARKERS = ("Shadow-SetUp", "active_rice.sh")
+# Markers that ONLY the full framework .zshrc carries.
+# "Shadow-SetUp" alone is not enough: the PATH block written by install.sh
+# says "# Shadow-SetUp PATH" and the appended RICE block says "active_rice.sh"
+# — treating those as markers made a minimal rc look complete, so the module
+# skipped the real copy and the prompt never got Oh My Zsh (bare "%").
+ZSHRC_MARKERS = ("Shadow-SetUp · .zshrc", "SHADOW_BASE_ALIASES")
 
 # Framework files + where to fetch them when a partial install wiped them
 RAW_BASE = "https://raw.githubusercontent.com/Shadow-TermDev/Shadow-SetUp/main/dotfiles"
-FRAMEWORK_FILES = (".zshrc", ".nanorc", "aliases.sh")
+FRAMEWORK_FILES = (".zshrc", ".nanorc", ".p10k.zsh", "aliases.sh")
 
 
 class DotfilesModule(BaseModule):
@@ -56,7 +60,7 @@ class DotfilesModule(BaseModule):
         return (dest / ".zshrc").exists()
 
     def _is_framework_zshrc(self, path: Path) -> bool:
-        """True when the rc file is the Shadow-SetUp one (or wires the RICE up)."""
+        """True only for the full framework .zshrc (see ZSHRC_MARKERS)."""
         try:
             if not path.exists():
                 return False
@@ -74,7 +78,7 @@ class DotfilesModule(BaseModule):
             installed_dir.mkdir(parents=True, exist_ok=True)
 
             # Restore framework files that a partial install may have missed
-            for required in (".zshrc", ".nanorc", "aliases.sh"):
+            for required in (".zshrc", ".nanorc", ".p10k.zsh", "aliases.sh"):
                 src = dotfiles_dir / required
                 dst = installed_dir / required
                 if src.exists() and not dst.exists():
@@ -95,6 +99,28 @@ class DotfilesModule(BaseModule):
                     success_box("File", "active_rice.sh sourcing added to .zshrc")
                 else:
                     warning_box("Dotfiles", ".zshrc source not found — skipped")
+
+            # nano config — deployed to ~/.nanorc (the 'nanorc' alias edits it)
+            src_nanorc = installed_dir / ".nanorc"
+            dst_nanorc = Path.home() / ".nanorc"
+            if src_nanorc.exists():
+                try:
+                    same = dst_nanorc.exists() and dst_nanorc.read_bytes() == src_nanorc.read_bytes()
+                except OSError:
+                    same = False
+                if not same:
+                    if dst_nanorc.exists():
+                        backup_file(dst_nanorc)
+                    shutil.copy2(src_nanorc, dst_nanorc)
+                    success_box("File", ".nanorc installed")
+
+            # p10k base config — only as a fallback: a RICE usually ships its
+            # own .p10k.zsh via `rice set`, which must never be overwritten here
+            src_p10k = installed_dir / ".p10k.zsh"
+            dst_p10k = Path.home() / ".p10k.zsh"
+            if src_p10k.exists() and not dst_p10k.exists():
+                shutil.copy2(src_p10k, dst_p10k)
+                success_box("File", ".p10k.zsh installed (base config)")
 
             # Base aliases (rice-level aliases live in ~/.shadow-setup/aliases.sh
             # and are owned by the active RICE, so they are left untouched here)
@@ -158,6 +184,11 @@ class DotfilesModule(BaseModule):
         if not zshrc.exists():
             return {"status": "missing", "details": ".zshrc missing"}
         if self._is_framework_zshrc(zshrc):
+            if not (Path.home() / ".nanorc").exists():
+                return {
+                    "status": "partial",
+                    "details": ".zshrc ok, .nanorc missing (sw install dotfiles)",
+                }
             return {"status": "ok", "details": ".zshrc installed (Shadow-SetUp)"}
         return {
             "status": "missing",

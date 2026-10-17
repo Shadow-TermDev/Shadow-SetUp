@@ -72,6 +72,34 @@ ensure_shell_path() {
     fi
 }
 
+# Guarantee the framework .zshrc in ~/.zshrc, independent of the Python
+# modules: a PATH-block-only rc never loads Oh My Zsh (bare zsh "%" prompt).
+# Match is precise: the header/aliases wiring — never the "# Shadow-SetUp
+# PATH" comment, which install.sh itself writes into a minimal rc.
+ensure_framework_zshrc() {
+    local src="$SHADOW_DATA/dotfiles/.zshrc"
+    local dst="$HOME/.zshrc"
+    [ -f "$src" ] || { warn "Framework .zshrc missing at $src — run: sw install dotfiles"; return 1; }
+    if [ -f "$dst" ] && { grep -q 'Shadow-SetUp · .zshrc' "$dst" 2>/dev/null \
+                        || grep -q 'SHADOW_BASE_ALIASES' "$dst" 2>/dev/null; }; then
+        return 0
+    fi
+    if [ -f "$dst" ]; then
+        cp "$dst" "$dst.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null && info "Existing .zshrc backed up"
+    fi
+    cp "$src" "$dst" && ok "Framework .zshrc installed"
+}
+
+# nano config lives in ~/.nanorc (the 'nanorc' alias edits that file).
+# Safety net only: never touches an existing/custom .nanorc.
+ensure_nanorc() {
+    local src="$SHADOW_DATA/dotfiles/.nanorc"
+    local dst="$HOME/.nanorc"
+    [ -f "$src" ] || return 0
+    [ -f "$dst" ] && return 0
+    cp "$src" "$dst" && ok ".nanorc installed"
+}
+
 # -----------------------------------------------
 # Dependencies
 # -----------------------------------------------
@@ -253,6 +281,14 @@ case "$choice" in
     3) info "Skipping module install" ;;
     *) install_modules shell tools dotfiles aliases ;;
 esac
+
+# Dotfiles safety net (even for minimal): the framework .zshrc is what loads
+# Oh My Zsh + the RICE, so it must land in ~/.zshrc no matter how the module
+# phase went. Bash-level: does not depend on the Python modules at all.
+if [ "$choice" != "3" ]; then
+    ensure_framework_zshrc
+    ensure_nanorc
+fi
 
 # Oh My Zsh may have rewritten ~/.zshrc above — make sure PATH survived
 ensure_shell_path
