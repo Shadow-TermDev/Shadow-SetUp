@@ -292,9 +292,30 @@ ensure_login_shell() {
     fi
 }
 
+# Offer an immediate retry when Oh My Zsh is missing: on a slow link this is
+# the difference between a themed prompt and a bare zsh "%".
+retry_shell_if_broken() {
+    command -v zsh &>/dev/null || return 0
+    [ -d "$HOME/.oh-my-zsh" ] && return 0
+    echo ""
+    warn "Oh My Zsh did not install — the prompt will fall back to plain zsh."
+    read -p "  Retry now? [Y/n]: " retry_input < /dev/tty || return 0
+    case "${retry_input:-Y}" in
+        [nN]*) info "Skipping retry — run later: sw install shell" ;;
+        *)
+            info "Retrying shell install..."
+            python3 "$SHADOW_DATA/_lib/cli.py" install shell < /dev/tty \
+                || warn "Retry failed — run later: sw install shell"
+            ;;
+    esac
+    [ -d "$HOME/.oh-my-zsh" ] \
+        || warn "Oh My Zsh still missing — the shell works but the prompt stays plain zsh. Fix with: sw install shell"
+}
+
 if [ "$choice" != "3" ]; then
     verify_shell
     ensure_login_shell
+    retry_shell_if_broken
 fi
 
 # -----------------------------------------------
@@ -393,6 +414,15 @@ command -v sw &>/dev/null || warn "'sw' not in PATH for new sessions yet — ope
 # -----------------------------------------------
 # Final
 # -----------------------------------------------
+# One-line shell status so a partial install is never a surprise
+if command -v zsh &>/dev/null && [ -d "$HOME/.oh-my-zsh" ]; then
+    ok "Shell ready (zsh + Oh My Zsh)"
+elif command -v zsh &>/dev/null; then
+    warn "Shell partial — Oh My Zsh missing. Fix with: sw install shell"
+else
+    warn "zsh not installed — the session stays on bash. Fix with: sw install shell"
+fi
+
 echo ""
 echo -e "${GREEN}${BOLD}Installation complete!${NC}"
 echo ""

@@ -56,8 +56,15 @@ done
 plugins=(git "${_zsh_plugins[@]}")
 unset _p _zsh_plugins
 
-# Guarded: without Oh My Zsh the RICE + aliases must still load
-[[ -r "$ZSH/oh-my-zsh.sh" ]] && source $ZSH/oh-my-zsh.sh
+# Guarded: without Oh My Zsh the RICE + aliases must still load.
+# Degraded mode (OMZ missing after a failed/slow install): be loud about it
+# and keep a usable prompt instead of bare zsh "%".
+if [[ -r "$ZSH/oh-my-zsh.sh" ]]; then
+    source $ZSH/oh-my-zsh.sh
+else
+    print -P "%F{red}[Shadow-SetUp]%f %BOh My Zsh is missing%b — repair with: %Bsw install shell%b"
+    PROMPT='%F{cyan}%~%f %# '
+fi
 
 # Powerlevel10k config (only if not disabled)
 if [[ "$SHADOW_DISABLE_P10K" != "true" ]]; then
