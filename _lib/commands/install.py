@@ -16,13 +16,19 @@ class InstallCommand(Command):
     tui_section = "main"
 
     def execute(self, args=None):
-        from _lib.utils.ui import console, success_box, error_box, info_box
-        from _lib.modules.loader import load_modules
+        from _lib.utils.ui import console, success_box, error_box, info_box, report_load_errors
+        from _lib.modules.loader import load_modules, get_module_load_errors
 
         if args is None:
             args = []
 
         modules = load_modules()
+
+        # An empty module list used to produce a selector with no options
+        if not modules:
+            report_load_errors("Modules", get_module_load_errors())
+            error_box("Error", "No modules available — reinstall Shadow-SetUp")
+            return
 
         # If no args from TUI, show module selector
         if not args:

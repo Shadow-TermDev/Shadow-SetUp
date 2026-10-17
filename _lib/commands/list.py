@@ -13,11 +13,12 @@ class ListCommand(Command):
     tui_section = "main"
 
     def execute(self, args: list[str] = None) -> None:
-        from _lib.utils.ui import banner, module_table
-        from _lib.modules.loader import load_modules
+        from _lib.utils.ui import banner, module_table, report_load_errors
+        from _lib.modules.loader import load_modules, get_module_load_errors
 
         modules = load_modules()
         banner()
+        report_load_errors("Modules", get_module_load_errors())
         modules_info = {}
         for name, mod in sorted(modules.items()):
             status = mod.status()

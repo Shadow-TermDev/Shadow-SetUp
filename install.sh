@@ -20,7 +20,7 @@ info() { echo -e "${CYAN}[>>]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!!]${NC} $1"; }
 fail() { echo -e "${RED}[XX]${NC} $1"; exit 1; }
 
-trap 'echo -e "\n${YELLOW}[!!]${NC} Cancelled"; exit 1' INT
+trap 'echo -e "\n${YELLOW}[!!]${NC} Cancelled — install left partial. Re-run install.sh to repair."; exit 1' INT
 
 # -----------------------------------------------
 # Banner
@@ -40,6 +40,37 @@ echo ""
 # -----------------------------------------------
 SHADOW_DATA="$HOME/.shadow-setup"
 SHADOW_BIN="$HOME/.local/bin"
+
+# -----------------------------------------------
+# Helpers — bin dir + PATH idempotency
+# -----------------------------------------------
+# Always (re)create ~/.local/bin so wrappers never land on a missing dir.
+ensure_bin_dir() {
+    mkdir -p "$SHADOW_BIN" 2>/dev/null
+    [ -d "$SHADOW_BIN" ] || fail "Cannot create $SHADOW_BIN"
+}
+
+# Add ~/.local/bin to one rc file if it is not exported there yet.
+# Idempotent, so reinstalling never duplicates the line.
+ensure_path_in_rc() {
+    local rc="$1"
+    [ -n "$rc" ] || return 0
+    [ -f "$rc" ] || touch "$rc" 2>/dev/null || return 0
+    grep -q '\.local/bin' "$rc" 2>/dev/null && return 0
+    printf '\n%s\n%s\n' '# Shadow-SetUp PATH' 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+    PATH_CHANGED=1
+}
+
+# Verify PATH landed in the rc files the user can actually boot with (zsh + bash).
+# Called more than once: Oh My Zsh may rewrite ~/.zshrc after this runs.
+ensure_shell_path() {
+    PATH_CHANGED=0
+    ensure_path_in_rc "$HOME/.zshrc"
+    ensure_path_in_rc "$HOME/.bashrc"
+    if [ "$PATH_CHANGED" -eq 1 ]; then
+        ok "PATH added to shell rc"
+    fi
+}
 
 # -----------------------------------------------
 # Dependencies
@@ -63,7 +94,8 @@ ok "Python packages installed"
 # Directories
 # -----------------------------------------------
 info "Setting up directories..."
-mkdir -p "$SHADOW_DATA" "$SHADOW_DATA/cache" "$SHADOW_DATA/backups" "$SHADOW_BIN"
+mkdir -p "$SHADOW_DATA" "$SHADOW_DATA/cache" "$SHADOW_DATA/backups"
+ensure_bin_dir
 ok "Directories ready"
 
 # -----------------------------------------------
@@ -77,30 +109,53 @@ git clone --depth=1 https://github.com/Shadow-TermDev/Shadow-SetUp.git "$TEMP_DI
     || fail "Failed to download repository"
 ok "Repository downloaded"
 
+# Bundled RICEs live in the cloned repo (used by the offline copy + selection steps)
+REPO_RICES="$TEMP_DIR/dotfiles/rices"
+
 # -----------------------------------------------
 # Install files (EXCEPT rices — handled later)
 # -----------------------------------------------
 info "Installing files..."
 
-[ -d "$TEMP_DIR/_lib" ] && { rm -rf "$SHADOW_DATA/_lib"; cp -r "$TEMP_DIR/_lib" "$SHADOW_DATA/_lib"; ok "_lib installed"; }
+[ -d "$TEMP_DIR/_lib" ] || fail "Repository is missing _lib/ — cannot install CLI"
+rm -rf "$SHADOW_DATA/_lib"
+cp -r "$TEMP_DIR/_lib" "$SHADOW_DATA/_lib"
+[ -f "$SHADOW_DATA/_lib/cli.py" ] || fail "CLI install failed (_lib/cli.py missing)"
+ok "_lib installed"
 
 if [ -d "$TEMP_DIR/dotfiles" ]; then
     # Preserve existing rices before overwriting
     EXISTING_RICES=""
+    RICES_SAFE=false
     if [ -d "$SHADOW_DATA/dotfiles/rices" ]; then
+        # cache/ may be missing on a partial install — never lose local RICEs
+        mkdir -p "$SHADOW_DATA/cache"
         EXISTING_RICES="$SHADOW_DATA/cache/existing_rices_backup"
         rm -rf "$EXISTING_RICES"
-        cp -r "$SHADOW_DATA/dotfiles/rices" "$EXISTING_RICES"
+        if cp -r "$SHADOW_DATA/dotfiles/rices" "$EXISTING_RICES"; then
+            RICES_SAFE=true
+        else
+            warn "Could not back up existing RICEs — keeping them in place"
+        fi
     fi
-    
-    rm -rf "$SHADOW_DATA/dotfiles"
+
+    # Wipe only when the local RICEs are safely backed up
+    if [ "$RICES_SAFE" = true ] || [ ! -d "$SHADOW_DATA/dotfiles/rices" ]; then
+        rm -rf "$SHADOW_DATA/dotfiles"
+    else
+        warn "Keeping existing dotfiles (RICE backup failed)"
+    fi
     mkdir -p "$SHADOW_DATA/dotfiles"
-    # Copy everything EXCEPT rices directory
+    # Copy everything EXCEPT rices directory.
+    # dotglob is required: without it hidden dotfiles (.zshrc, .nanorc,
+    # .p10k.zsh, .termux/) are skipped by the glob and the RICE never gets sourced.
+    shopt -s dotglob nullglob
     for item in "$TEMP_DIR/dotfiles"/*; do
         item_name=$(basename "$item")
         [ "$item_name" = "rices" ] && continue
         cp -r "$item" "$SHADOW_DATA/dotfiles/"
     done
+    shopt -u dotglob nullglob
     # Restore existing rices (if any)
     if [ -n "$EXISTING_RICES" ] && [ -d "$EXISTING_RICES" ]; then
         mkdir -p "$SHADOW_DATA/dotfiles/rices"
@@ -116,7 +171,30 @@ if [ -d "$TEMP_DIR/dotfiles" ]; then
         mkdir -p "$SHADOW_DATA/dotfiles/rices"
         cp "$TEMP_DIR/dotfiles/rices/manifest.json" "$SHADOW_DATA/dotfiles/rices/"
     }
+    # Belt and braces: guarantee the framework dotfiles are present,
+    # no matter what the glob above did.
+    for required in .zshrc .nanorc; do
+        if [ -f "$TEMP_DIR/dotfiles/$required" ]; then
+            cp -f "$TEMP_DIR/dotfiles/$required" "$SHADOW_DATA/dotfiles/$required" \
+                || fail "Failed to install dotfiles/$required"
+        fi
+    done
+    [ -f "$SHADOW_DATA/dotfiles/.zshrc" ] || warn ".zshrc not installed — shell module will not load RICEs"
     ok "dotfiles installed"
+fi
+
+# Ship every bundled RICE so `sw rice set <name>` works offline.
+# Existing local RICEs (possibly customized) are never overwritten.
+if [ -d "$REPO_RICES" ]; then
+    for d in "$REPO_RICES"/*; do
+        [ -d "$d" ] || continue
+        rname=$(basename "$d")
+        [ -f "$d/rice.sh" ] || [ -f "$d/manifest.json" ] || continue
+        if [ ! -d "$SHADOW_DATA/dotfiles/rices/$rname" ]; then
+            mkdir -p "$SHADOW_DATA/dotfiles/rices"
+            cp -r "$d" "$SHADOW_DATA/dotfiles/rices/" && ok "RICE '$rname' bundled"
+        fi
+    done
 fi
 
 [ -f "$TEMP_DIR/.version" ] && { cp "$TEMP_DIR/.version" "$SHADOW_DATA/.version"; ok ".version installed"; }
@@ -125,29 +203,26 @@ fi
 # CLI wrappers
 # -----------------------------------------------
 info "Creating CLI commands..."
+# Re-create the bin dir: this step must survive partial/interrupted installs
+ensure_bin_dir
+[ -f "$SHADOW_DATA/_lib/cli.py" ] || fail "CLI missing at $SHADOW_DATA/_lib/cli.py"
 for cmd in sw shadow; do
-    cat > "$SHADOW_BIN/$cmd" << EOF
+    cat > "$SHADOW_BIN/$cmd" << EOF || fail "Cannot write wrapper '$cmd' in $SHADOW_BIN"
 #!/data/data/com.termux/files/usr/bin/bash
 exec python3 "$SHADOW_DATA/_lib/cli.py" "\$@"
 EOF
-    chmod +x "$SHADOW_BIN/$cmd"
+    chmod +x "$SHADOW_BIN/$cmd" || fail "Cannot make '$cmd' executable"
+    [ -x "$SHADOW_BIN/$cmd" ] || fail "Wrapper '$cmd' is not executable"
     ok "Command '$cmd' created"
 done
+# Make the new commands usable in this very session
+export PATH="$SHADOW_BIN:$PATH"
 
 # -----------------------------------------------
 # PATH
 # -----------------------------------------------
 info "Setting up PATH..."
-SHELL_RC="$HOME/.zshrc"
-[ ! -f "$SHELL_RC" ] && SHELL_RC="$HOME/.bashrc"
-if ! grep -q '\.local/bin' "$SHELL_RC" 2>/dev/null; then
-    echo '' >> "$SHELL_RC"
-    echo '# Shadow-SetUp PATH' >> "$SHELL_RC"
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_RC"
-    ok "PATH added"
-else
-    ok "PATH already configured"
-fi
+ensure_shell_path
 
 # -----------------------------------------------
 # Module installation
@@ -169,38 +244,39 @@ case "$choice" in
     *) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases < /dev/tty ;;
 esac
 
+# Oh My Zsh may have rewritten ~/.zshrc above — make sure PATH survived
+ensure_shell_path
+
 # -----------------------------------------------
-# RICE selection — ONLY COPY SELECTED ONE
+# RICE selection — SELECT WHICH ONE TO ACTIVATE
 # -----------------------------------------------
 echo ""
 echo -e "${BOLD}--- RICE Selection ---${NC}"
 echo ""
 
-# RICEs from downloaded repo
-REPO_RICES="$TEMP_DIR/dotfiles/rices"
-
-# Helper: install default RICE if no local RICEs exist
+# Helper: guarantee a usable RICE — activate the default one when none is active
 install_default_if_needed() {
     LOCAL_RICES="$SHADOW_DATA/dotfiles/rices"
-    HAS_RICES=false
-    if [ -d "$LOCAL_RICES" ]; then
-        for d in "$LOCAL_RICES"/*; do
-            if [ -d "$d" ] && { [ -f "$d/rice.sh" ] || [ -f "$d/manifest.json" ]; }; then
-                HAS_RICES=true
-                break
-            fi
-        done
-    fi
-    
-    if [ "$HAS_RICES" = false ]; then
-        if [ -d "$REPO_RICES/default" ]; then
-            mkdir -p "$SHADOW_DATA/dotfiles/rices"
-            cp -r "$REPO_RICES/default" "$SHADOW_DATA/dotfiles/rices/"
-            info "No RICEs found — installing default..."
-            python3 "$SHADOW_DATA/_lib/cli.py" rice set default < /dev/tty
-        fi
-    else
+    ACTIVE_NAME_FILE="$SHADOW_DATA/active_rice_name"
+    ACTIVE_LINK="$SHADOW_DATA/active_rice.sh"
+
+    # Something is already active and wired up — leave it alone
+    if [ -s "$ACTIVE_NAME_FILE" ] && [ -f "$ACTIVE_LINK" ]; then
         info "RICEs exist — keeping current setup"
+        return
+    fi
+
+    TARGET="default"
+    if [ ! -d "$LOCAL_RICES/$TARGET" ] && [ -d "$REPO_RICES/$TARGET" ]; then
+        mkdir -p "$LOCAL_RICES"
+        cp -r "$REPO_RICES/$TARGET" "$LOCAL_RICES/"
+    fi
+
+    if [ -d "$LOCAL_RICES/$TARGET" ]; then
+        info "No active RICE — installing default..."
+        python3 "$SHADOW_DATA/_lib/cli.py" rice set "$TARGET" < /dev/tty
+    else
+        warn "No RICE available — skipping"
     fi
 }
 
@@ -233,9 +309,12 @@ else
         install_default_if_needed
     elif [[ "$rice_input" =~ ^[0-9]+$ ]] && [ "$rice_input" -ge 1 ] && [ "$rice_input" -le "$RICE_COUNT" ]; then
         PICKED="${RICE_LIST[$((rice_input-1))]}"
-        # Copy ONLY this RICE
-        mkdir -p "$SHADOW_DATA/dotfiles/rices"
-        cp -r "$REPO_RICES/$PICKED" "$SHADOW_DATA/dotfiles/rices/"
+        # Copy ONLY if missing — `cp -r src dst/` into an existing dir would nest it
+        if [ ! -d "$SHADOW_DATA/dotfiles/rices/$PICKED" ]; then
+            mkdir -p "$SHADOW_DATA/dotfiles/rices"
+            cp -r "$REPO_RICES/$PICKED" "$SHADOW_DATA/dotfiles/rices/" \
+                || warn "Could not copy RICE '$PICKED' from repo"
+        fi
         info "Installing '$PICKED'..."
         python3 "$SHADOW_DATA/_lib/cli.py" rice set "$PICKED" < /dev/tty
     else
@@ -249,6 +328,17 @@ fi
 # Clean up temp
 # -----------------------------------------------
 rm -rf "$TEMP_DIR"
+
+# -----------------------------------------------
+# Final verification — wrappers + PATH must survive the whole run
+# -----------------------------------------------
+ensure_bin_dir
+for cmd in sw shadow; do
+    [ -x "$SHADOW_BIN/$cmd" ] || fail "Wrapper '$cmd' missing or broken — re-run install.sh"
+done
+ensure_shell_path
+export PATH="$SHADOW_BIN:$PATH"
+command -v sw &>/dev/null || warn "'sw' not in PATH for new sessions yet — open a new terminal"
 
 # -----------------------------------------------
 # Final

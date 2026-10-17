@@ -197,10 +197,23 @@ def status_table(status_data: dict):
 
     console.print(table)
 
+def report_load_errors(section: str, errors: list[tuple[str, str]]) -> None:
+    """Explain why a section is empty — a silent load failure used to leave
+    the TUI showing nothing but the Exit entry."""
+    if not errors:
+        return
+    error_box(section, f"{len(errors)} item(s) failed to load")
+    for name, reason in errors:
+        console.print(f"  [red]{name}[/red]: {reason}")
+    console.print(
+        "[dim]Missing dependency? Try: [cyan]pip install --user rich InquirerPy pyfiglet[/cyan][/dim]"
+    )
+    console.print()
+
 def interactive_menu():
     """Interactive TUI menu with arrow key navigation."""
     from InquirerPy import inquirer
-    from _lib.commands import get_tui_commands, load_commands
+    from _lib.commands import get_tui_commands, load_commands, get_load_errors
 
     # Ensure commands are loaded
     load_commands()
@@ -214,6 +227,7 @@ def interactive_menu():
 
     console.clear()
     banner()
+    report_load_errors("Commands", get_load_errors())
 
     try:
         action = inquirer.select(

@@ -32,6 +32,9 @@ class Command:
 
 # Command registry — populated by load_commands()
 COMMANDS: list[Command] = []
+# Load failures (module name, reason) — shown in the TUI so a broken install
+# never looks like an empty menu with a single "Exit" entry
+LOAD_ERRORS: list[tuple[str, str]] = []
 
 _COMMANDS_DIR = Path(__file__).parent
 
@@ -68,8 +71,9 @@ def _make_command(cls) -> Command:
 
 def load_commands() -> list[Command]:
     """Auto-discover and instantiate all Command subclasses in _lib/commands/."""
-    global COMMANDS
+    global COMMANDS, LOAD_ERRORS
     commands = []
+    LOAD_ERRORS = []
 
     for importer, modname, ispkg in pkgutil.iter_modules([str(_COMMANDS_DIR)]):
         if modname.startswith("_") or modname == "base":
@@ -80,6 +84,7 @@ def load_commands() -> list[Command]:
             mod = importlib.import_module(full_name)
 
             # Find the class that inherits from Command
+            found = False
             for attr_name in dir(mod):
                 attr = getattr(mod, attr_name)
                 if (
@@ -90,16 +95,29 @@ def load_commands() -> list[Command]:
                 ):
                     cmd = _make_command(attr)
                     commands.append(cmd)
+                    found = True
                     break
+
+            if not found:
+                LOAD_ERRORS.append((modname, "no Command subclass found"))
 
         except Exception as e:
             import warnings
             warnings.warn(f"Failed to load command '{modname}': {e}", stacklevel=2)
+            LOAD_ERRORS.append((modname, str(e)))
 
     # Sort by tui_position
     commands.sort(key=lambda c: c.tui_position or 999)
     COMMANDS = commands
     return commands
+
+def get_load_errors() -> list[tuple[str, str]]:
+    """Commands that failed to load (name, reason).
+
+    Note: avoid the list() builtin here — importing the `list` command module
+    binds `_lib.commands.list` as an attribute of this package and shadows it.
+    """
+    return [err for err in LOAD_ERRORS]
 
 def get_command(arg: str) -> Command | None:
     """Get a command by name or alias."""

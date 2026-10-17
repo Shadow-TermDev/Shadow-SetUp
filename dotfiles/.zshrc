@@ -52,7 +52,8 @@ done
 plugins=(git "${_zsh_plugins[@]}")
 unset _p _zsh_plugins
 
-source $ZSH/oh-my-zsh.sh
+# Guarded: without Oh My Zsh the RICE + aliases must still load
+[[ -r "$ZSH/oh-my-zsh.sh" ]] && source $ZSH/oh-my-zsh.sh
 
 # Powerlevel10k config (only if not disabled)
 if [[ "$SHADOW_DISABLE_P10K" != "true" ]]; then

@@ -11,7 +11,7 @@ class RiceCommand(Command):
         "rice                 # List RICEs",
         "rice list            # List available RICEs",
         "rice set kawaii      # Activate kawaii RICE",
-        "rice set kawaii -f   # Force reinstall RICE",
+        "rice set kawaii -f   # Re-apply local RICE (no re-download)",
         "rice update nordic   # Update rice from git",
         "rice reset           # Reset to default rice",
         "rice check           # Show active RICE",
@@ -74,6 +74,7 @@ class RiceCommand(Command):
         official = fetch_official_rices()
         local = list_local_rices()
         local_names = {r["name"] for r in local}
+        incomplete_names = {r["name"] for r in local if r.get("incomplete")}
         # Mapa nombre manifest -> dir para resolver alias nordic <-> nordic-rice-termux
         manifest_to_dir = {}
         for r in local:
@@ -83,6 +84,9 @@ class RiceCommand(Command):
         active = get_active_rice()
 
         def _is_active(official_key: str) -> bool:
+            # No active RICE: nothing can match (None == None used to be True)
+            if active is None:
+                return False
             if official_key == active:
                 return True
             # alias manifest.name
@@ -99,7 +103,12 @@ class RiceCommand(Command):
         console.print("[bold]Official RICEs:[bold]")
         for name, info in sorted(official.items()):
             installed = name in local_names or manifest_to_dir.get(name) in local_names
-            installed_str = " [dim]+installed[/dim]" if installed else ""
+            if not installed:
+                installed_str = ""
+            elif name in incomplete_names or manifest_to_dir.get(name) in incomplete_names:
+                installed_str = " [yellow]+incomplete[/yellow]"
+            else:
+                installed_str = " [dim]+installed[/dim]"
             marker = " [green]*[/green]" if _is_active(name) else ""
             # tag externo vs bundled
             tag = ""
@@ -131,13 +140,17 @@ class RiceCommand(Command):
             console.print()
             console.print("[bold]Community / Local RICEs:[bold]")
             for rice in custom:
-                marker = " [green]*[/green]" if rice["name"] == active or rice["manifest"].get("name") == active else ""
+                is_act = rice["name"] == active or (
+                    active is not None and rice["manifest"].get("name") == active
+                )
+                marker = " [green]*[/green]" if is_act else ""
                 # Detectar source meta
                 meta_path = Path(rice["path"]).parent / f".{rice['name']}.meta.json" if False else None
                 # mostrar descripción del manifest si existe
                 desc = rice["manifest"].get("description", "")
                 desc_str = f" — {desc}" if desc else ""
-                console.print(f"  [cyan]{rice['name']}[/cyan]{marker} [dim](community)[/dim]{desc_str}")
+                incomplete = " [yellow](incomplete)[/yellow]" if rice.get("incomplete") else ""
+                console.print(f"  [cyan]{rice['name']}[/cyan]{marker} [dim](community)[/dim]{incomplete}{desc_str}")
         elif not custom and local:
             # Todos son oficiales, mostrar sección local informativa pero vacía
             console.print()
@@ -188,8 +201,12 @@ class RiceCommand(Command):
             console.print()
             console.print("[bold]Installed RICEs:[bold]")
             for rice in local:
-                marker = " [green]*[/green]" if rice["name"] == active or rice["manifest"].get("name") == active else ""
-                console.print(f"  [cyan]{rice['name']}[/cyan]{marker}")
+                is_act = rice["name"] == active or (
+                    active is not None and rice["manifest"].get("name") == active
+                )
+                marker = " [green]*[/green]" if is_act else ""
+                incomplete = " [yellow](incomplete)[/yellow]" if rice.get("incomplete") else ""
+                console.print(f"  [cyan]{rice['name']}[/cyan]{marker}{incomplete}")
         else:
             console.print()
             console.print("[dim]No RICEs installed[/dim]")

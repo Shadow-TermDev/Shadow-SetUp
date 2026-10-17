@@ -20,10 +20,10 @@ sys.path.insert(0, str(lib_dir))
 from _lib import __version__
 from _lib.utils.ui import (
     console, banner, interactive_menu,
-    clear_screen
+    clear_screen, report_load_errors
 )
 from _lib.utils import ensure_dirs
-from _lib.commands import load_commands, get_command, get_all_commands
+from _lib.commands import load_commands, get_command, get_all_commands, get_load_errors
 
 # Dynamic command loading
 COMMANDS = load_commands()
@@ -133,6 +133,12 @@ def _handle_submenu(cmd):
 def main():
     """Main entry point."""
     ensure_dirs()
+
+    # Nothing loaded = broken install — say why instead of a silent empty TUI
+    if not COMMANDS:
+        report_load_errors("Commands", get_load_errors())
+        console.print("[red]No commands available — reinstall Shadow-SetUp[/red]")
+        sys.exit(1)
 
     args = sys.argv[1:]
 

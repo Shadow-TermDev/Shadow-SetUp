@@ -38,6 +38,7 @@ manifest.json schema:
 """
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -76,6 +77,125 @@ DEFAULT_FILE_MAP = {
 
 # Files that always go to ~/.termux/
 TERMUX_FILES = {"colors.properties", "font.ttf", "termux.properties"}
+
+# Block appended to a foreign ~/.zshrc so the active RICE is always sourced
+ZSHRC_RICE_BLOCK = """# >>> Shadow-SetUp RICE >>>
+# Keeps the active RICE sourced even with a foreign .zshrc (Oh My Zsh / p10k)
+[ -f "$HOME/.shadow-setup/active_rice.sh" ] && source "$HOME/.shadow-setup/active_rice.sh"
+# <<< Shadow-SetUp RICE <<<"""
+
+
+def rice_is_complete(rice_dir: Path) -> bool:
+    """A RICE dir is usable once it has a rice.sh or a manifest.json."""
+    return rice_dir.is_dir() and (
+        (rice_dir / "rice.sh").exists() or (rice_dir / "manifest.json").exists()
+    )
+
+
+def rice_is_incomplete(rice_dir: Path) -> bool:
+    """True when the dir exists but holds no usable RICE (half-copied install)."""
+    return rice_dir.exists() and not rice_is_complete(rice_dir)
+
+
+def local_rice_sources(rice_name: str) -> list[Path]:
+    """Candidate dirs that may hold a bundled copy of a local RICE.
+
+    Order: package data dir (dev checkout or installed ~/.shadow-setup),
+    dev clone under ~/Shadow-SetUp, then the installed data dir.
+    The destination itself is filtered out by the caller so we never
+    copy a directory onto itself.
+    """
+    return [
+        Path(__file__).parent.parent.parent / "dotfiles" / "rices" / rice_name,
+        Path.home() / "Shadow-SetUp" / "dotfiles" / "rices" / rice_name,
+        Path.home() / ".shadow-setup" / "dotfiles" / "rices" / rice_name,
+    ]
+
+
+def _searched_paths(paths: list[Path]) -> str:
+    return "\n".join(f"    - {p}" for p in paths)
+
+
+def incomplete_rice_message(rice_name: str, rice_dir: Path) -> str:
+    """Explain that the dir exists but is a half-copied RICE (not 'not found')."""
+    return (
+        f"Incomplete RICE '{rice_name}': {rice_dir} exists but has no rice.sh "
+        f"and no manifest.json (interrupted copy).\n"
+        f"Remove it with 'sw rice delete {rice_name}' and set it again."
+    )
+
+
+def local_rice_not_found_message(rice_name: str) -> str:
+    """Explain that a local RICE source is missing, listing every path tried."""
+    paths = local_rice_sources(rice_name)
+    return (
+        f"Local RICE '{rice_name}' not found.\n"
+        f"  Searched:\n{_searched_paths(paths)}\n"
+        f"  A local RICE ships with the installer — reinstall Shadow-SetUp or use "
+        f"'sw rice install <url>' for remote RICEs."
+    )
+
+
+def remove_motd() -> bool:
+    """Delete the Termux MOTD so it does not override the RICE greeting."""
+    prefix = os.environ.get("PREFIX") or "/data/data/com.termux/files/usr"
+    motd = Path(prefix) / "etc" / "motd"
+    try:
+        if motd.is_file() or motd.is_symlink():
+            motd.unlink()
+            return True
+    except OSError:
+        pass
+    return False
+
+
+def ensure_zshrc_sources_rice() -> bool:
+    """Guarantee ~/.zshrc sources active_rice.sh.
+
+    A foreign .zshrc (Oh My Zsh / p10k default) never sources the RICE, so
+    `sw rice set` looked successful while no alias was actually loaded.
+    Returns True when ~/.zshrc was modified.
+    """
+    zshrc = Path.home() / ".zshrc"
+    try:
+        if zshrc.exists():
+            content = zshrc.read_text()
+            if "active_rice.sh" in content:
+                return False
+        else:
+            # No rc at all: prefer the framework .zshrc (it already wires PATH + RICE)
+            base = SHADOW_DATA / "dotfiles" / ".zshrc"
+            if base.exists():
+                shutil.copy2(base, zshrc)
+                return True
+            zshrc.touch()
+        with open(zshrc, "a") as f:
+            f.write("\n" + ZSHRC_RICE_BLOCK + "\n")
+        return True
+    except Exception:
+        return False
+
+
+def _stamp_rice_marker(dst: Path, rice_name: str) -> None:
+    """Stamp the RICE name inside active_rice.sh for exact active detection."""
+    try:
+        marker = f"# shadow-rice-name: {rice_name}"
+        lines = [
+            ln for ln in dst.read_text().splitlines()
+            if not ln.startswith("# shadow-rice-name:")
+        ]
+        lines.append(marker)
+        dst.write_text("\n".join(lines) + "\n")
+    except Exception:
+        pass
+
+
+def _rice_name_from_marker(content: str) -> str | None:
+    """Read the RICE name stamped by apply_rice_files, if any."""
+    for line in content.splitlines():
+        if line.startswith("# shadow-rice-name:"):
+            return line.split(":", 1)[1].strip()
+    return None
 
 
 def ensure_dirs():
@@ -206,77 +326,89 @@ def is_official_rice(rice_name: str) -> bool:
 
 
 def list_local_rices() -> list[dict]:
-    """List locally installed RICEs."""
+    """List locally installed RICEs (incomplete dirs are flagged, not hidden)."""
     ensure_dirs()
     rices = []
 
     for rice_dir in sorted(RICES_DIR.iterdir()):
-        if rice_dir.is_dir():
-            # Ignorar manifest.json si fuera archivo (ya no, pero por seguridad)
-            if rice_dir.name == "manifest.json":
-                continue
-            # Solo considerar directorios que son rices (tienen manifest o rice.sh)
-            if not ((rice_dir / "manifest.json").exists() or (rice_dir / "rice.sh").exists()):
-                continue
-            manifest = load_manifest(rice_dir)
-            rices.append({
-                "name": rice_dir.name,
-                "path": str(rice_dir),
-                "has_script": (rice_dir / "rice.sh").exists(),
-                "active": is_active(rice_dir.name),
-                "manifest": manifest,
-                "is_official": is_official_rice(rice_dir.name),
-            })
+        if not rice_dir.is_dir():
+            continue
+        # Ignore manifest.json if it were a file
+        if rice_dir.name == "manifest.json":
+            continue
+        # Half-copied installs must stay visible so the user can delete/repair them
+        incomplete = not (
+            (rice_dir / "manifest.json").exists() or (rice_dir / "rice.sh").exists()
+        )
+        manifest = load_manifest(rice_dir) if not incomplete else {}
+        rices.append({
+            "name": rice_dir.name,
+            "path": str(rice_dir),
+            "has_script": (rice_dir / "rice.sh").exists(),
+            "active": (not incomplete) and is_active(rice_dir.name),
+            "incomplete": incomplete,
+            "manifest": manifest,
+            "is_official": is_official_rice(rice_dir.name),
+        })
 
     return rices
 
 
 def is_active(rice_name: str) -> bool:
-    """Check if a RICE is currently active."""
-    # Primary: check active_rice_name file (most reliable, avoids substring mismatch nordic vs nordic-rice-termux)
+    """Check if a RICE is currently active.
+
+    Detection order (deterministic, so manual restores stay consistent):
+      1. active_rice_name file — authoritative while it names an existing RICE
+      2. active_rice.sh symlink target
+      3. # shadow-rice-name marker inside active_rice.sh
+      4. content scan (legacy fallback)
+    """
+    recorded = None
     try:
         name_file = SHADOW_DATA / "active_rice_name"
         if name_file.exists():
-            active = name_file.read_text().strip()
-            if active == rice_name:
-                return True
-            # Also handle manifest name vs directory name: check manifest
-            rice_dir = RICES_DIR / rice_name
-            if rice_dir.exists():
-                manifest = load_manifest(rice_dir)
-                if manifest.get("name") == active:
-                    return True
-            # If active is manifest name, check reverse
-            active_dir = RICES_DIR / active
-            if active_dir.exists():
-                active_manifest = load_manifest(active_dir)
-                if active_manifest.get("name") == rice_name:
-                    return True
+            recorded = name_file.read_text().strip()
     except Exception:
-        pass
+        recorded = None
+
+    if recorded:
+        # Directory name vs manifest.name alias (e.g. nordic-rice-termux / nordic)
+        if recorded == rice_name:
+            return True
+        rice_dir = RICES_DIR / rice_name
+        if rice_dir.is_dir() and load_manifest(rice_dir).get("name") == recorded:
+            return True
+        recorded_dir = RICES_DIR / recorded
+        if recorded_dir.is_dir():
+            if load_manifest(recorded_dir).get("name") == rice_name:
+                return True
+            # A valid record wins: never let the link/content checks contradict it
+            return False
+        # Stale record (RICE deleted) -> fall through to the link/content checks
 
     if not ACTIVE_RICE_LINK.exists():
         return False
 
     try:
         if ACTIVE_RICE_LINK.is_symlink():
-            target = ACTIVE_RICE_LINK.resolve()
-            rice_dir = RICES_DIR / rice_name
-            return target.parent == rice_dir
-        content = ACTIVE_RICE_LINK.read_text().strip()
+            return ACTIVE_RICE_LINK.resolve().parent == RICES_DIR / rice_name
+        content = ACTIVE_RICE_LINK.read_text()
+        marker = _rice_name_from_marker(content)
+        if marker is not None:
+            return marker == rice_name
         return rice_name in content
     except Exception:
         return False
 
 
 def get_active_rice() -> str | None:
-    """Get the name of the currently active RICE."""
-    # Primary: active_rice_name file
+    """Get the name of the currently active RICE (see is_active for the order)."""
     try:
         name_file = SHADOW_DATA / "active_rice_name"
         if name_file.exists():
             name = name_file.read_text().strip()
-            if name:
+            # Only trust the record while its RICE dir still exists
+            if name and (RICES_DIR / name).is_dir():
                 return name
     except Exception:
         pass
@@ -287,10 +419,13 @@ def get_active_rice() -> str | None:
     try:
         if ACTIVE_RICE_LINK.is_symlink():
             target = ACTIVE_RICE_LINK.resolve()
-            return target.parent.name
-        content = ACTIVE_RICE_LINK.read_text().strip()
+            return target.parent.name if target.parent == RICES_DIR else None
+        content = ACTIVE_RICE_LINK.read_text()
+        marker = _rice_name_from_marker(content)
+        if marker is not None:
+            return marker
         for rice_dir in RICES_DIR.iterdir():
-            if rice_dir.name in content:
+            if rice_dir.is_dir() and rice_dir.name in content:
                 return rice_dir.name
         # Fallback: check manifest name
         for rice_dir in RICES_DIR.iterdir():
@@ -598,9 +733,10 @@ def apply_rice_files(rice_dir: Path) -> bool:
             _track_installed_file(dst)
 
             # Make active_rice.sh modular: ensure it sources its own aliases/functions
-            # Usa el método agnóstico del usuario (BASH_SOURCE) para que funcione
-            # tanto si se hace source desde bash como zsh, y sin depender del nombre del RICE
+            # Uses the user's agnostic method (BASH_SOURCE) so it works when sourced
+            # from either bash or zsh, without depending on the RICE name
             if dst_val == "active_rice.sh":
+                _stamp_rice_marker(dst, rice_dir.name)
                 try:
                     content = dst.read_text()
                     # Si rice.sh ya trae su propio loader (RICE_SCRIPT_DIR), no duplicar
@@ -666,6 +802,14 @@ fi
                 shutil.copytree(item, dst)
                 _track_installed_file(dst)
 
+        # Termux MOTD would print its own banner over the RICE greeting
+        if remove_motd():
+            console.print("  [dim]Termux MOTD removed[/dim]")
+
+        # A foreign .zshrc never sources the RICE — wire it up if needed
+        if ensure_zshrc_sources_rice():
+            console.print("  [dim]Added active_rice.sh sourcing to ~/.zshrc[/dim]")
+
         # Reload Termux settings
         try:
             subprocess.run(["termux-reload-settings"], capture_output=True, timeout=5)
@@ -684,22 +828,54 @@ def download_rice(rice_name: str, rice_info: dict) -> bool:
     ensure_dirs()
 
     rice_dir = RICES_DIR / rice_name
-    if rice_dir.exists() and ((rice_dir / "rice.sh").exists() or (rice_dir / "manifest.json").exists()):
+    if rice_is_complete(rice_dir):
         return True
 
-    # Oficial local (bundled)
+    incomplete = rice_dir.exists()
+
+    # Oficial local (bundled) — never "download" from dev-only paths
     if rice_info.get("local"):
-        possible_paths = [
-            Path(__file__).parent.parent.parent / "dotfiles" / "rices" / rice_name,
-            Path.home() / "Shadow-SetUp" / "dotfiles" / "rices" / rice_name,
-            Path.home() / ".shadow-setup" / "dotfiles" / "rices" / rice_name,
+        # Never copy a dir onto itself: in an installed layout the package data
+        # dir IS ~/.shadow-setup/dotfiles/rices, so it is filtered out here.
+        sources = [
+            p for p in local_rice_sources(rice_name)
+            if p.exists() and p.resolve() != rice_dir.resolve()
         ]
-        for repo_rice in possible_paths:
-            if repo_rice.exists() and ((repo_rice / "manifest.json").exists() or (repo_rice / "rice.sh").exists()):
-                shutil.copytree(repo_rice, rice_dir)
-                return True
-        error_box("Rice", f"Local RICE '{rice_name}' not found")
-        return False
+
+        if incomplete:
+            if not sources:
+                error_box("Rice", incomplete_rice_message(rice_name, rice_dir))
+                return False
+            warning_box("Rice", f"'{rice_name}' is incomplete — repairing from bundled copy")
+            shutil.rmtree(rice_dir, ignore_errors=True)
+
+        if not sources:
+            error_box("Rice", local_rice_not_found_message(rice_name))
+            return False
+
+        try:
+            shutil.copytree(sources[0], rice_dir)
+        except Exception as e:
+            error_box("Rice", f"Copy failed: {e}")
+            return False
+
+        if not rice_is_complete(rice_dir):
+            error_box(
+                "Rice",
+                f"Copied '{rice_name}' from {sources[0]} but it has no rice.sh "
+                f"and no manifest.json",
+            )
+            shutil.rmtree(rice_dir, ignore_errors=True)
+            return False
+        return True
+
+    # Remote sources fully replace a half-copied dir (git clone needs it empty)
+    if incomplete:
+        try:
+            shutil.rmtree(rice_dir)
+        except OSError as e:
+            error_box("Rice", f"Cannot replace incomplete RICE '{rice_name}': {e}")
+            return False
 
     # Oficial externo con repo (ej. nordic-rice-termux)
     if rice_info.get("repo") or rice_info.get("url"):
@@ -804,36 +980,32 @@ def backup_current_rice(rice_name: str, ask: bool = True) -> bool:
 
 
 def download_and_apply_rice(rice_name: str, keep_backup: bool = False, force: bool = False) -> bool:
-    """Download (if needed) and apply a RICE."""
+    """Download (if needed) and apply a RICE.
+
+    A complete local RICE is always reused — even with force=True — so
+    `sw rice set <name>` never depends on network or on dev-only paths.
+    force only makes the apply explicit; `sw rice update <name>` is the
+    way to pull remote changes. A half-copied dir is repaired instead of
+    being reported as "not found".
+    """
     ensure_dirs()
 
     rice_dir = RICES_DIR / rice_name
 
-    if not force:
-        is_downloaded = rice_dir.exists() and (
-            (rice_dir / "rice.sh").exists() or (rice_dir / "manifest.json").exists()
-        )
-    else:
-        is_downloaded = False
-        if rice_dir.exists():
-            shutil.rmtree(rice_dir)
-
-    if is_downloaded:
+    if rice_is_complete(rice_dir):
+        if force:
+            info_box(
+                "Rice",
+                f"'{rice_name}' is already local — re-applying it "
+                f"(use 'sw rice delete {rice_name}' for a fresh copy)",
+            )
         return _apply_existing_rice(rice_name)
 
-    # Fetch manifest
+    # Fetch manifest (needed to repair a half-copied dir or to download)
     official = fetch_official_rices()
 
     if rice_name in official:
         rice_info = official[rice_name]
-        # Si el nombre no está en oficial pero su manifest.name sí lo está, resolver alias
-        # (ej. manifest.name == "nordic" pero dir == "nordic-rice-termux")
-        if rice_name not in official:
-            for k, v in official.items():
-                m = load_manifest(rice_dir) if rice_dir.exists() else {}
-                if m.get("name") == k:
-                    rice_info = v
-                    break
     else:
         # Buscar alias por manifest.name (nordic -> nordic-rice-termux)
         found_alias = None
@@ -849,7 +1021,10 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = False, force: bo
             error_box("Rice", f"'{rice_name}' not found. Use 'sw rice install <url>' for custom RICEs.")
             return False
 
-    console.print(f"  [cyan]Downloading '{rice_name}'...[/cyan]")
+    if rice_dir.exists():
+        console.print(f"  [warning]Local '{rice_name}' is incomplete — repairing first[/warning]")
+    else:
+        console.print(f"  [cyan]Downloading '{rice_name}'...[/cyan]")
     if not download_rice(rice_name, rice_info):
         return False
 
@@ -859,6 +1034,13 @@ def download_and_apply_rice(rice_name: str, keep_backup: bool = False, force: bo
 def _apply_existing_rice(rice_name: str) -> bool:
     """Apply an already-downloaded RICE: deps → setup → files."""
     rice_dir = RICES_DIR / rice_name
+
+    if not rice_is_complete(rice_dir):
+        if rice_dir.exists():
+            error_box("Rice", incomplete_rice_message(rice_name, rice_dir))
+        else:
+            error_box("Rice", f"'{rice_name}' is not installed — run 'sw rice set {rice_name}'")
+        return False
 
     # 1. Install dependencies
     install_dependencies(rice_dir)
@@ -946,7 +1128,8 @@ def delete_rice(rice_name: str) -> bool:
         error_box("Rice", f"'{rice_name}' not found")
         return False
 
-    if is_active(rice_name):
+    # A half-copied dir can never be applied, so it may always be removed
+    if rice_is_complete(rice_dir) and is_active(rice_name):
         error_box("Rice", "Can't delete active RICE. Switch first.")
         return False
 
@@ -956,6 +1139,13 @@ def delete_rice(rice_name: str) -> bool:
         meta = RICES_DIR / f".{rice_name}.meta.json"
         if meta.exists():
             meta.unlink()
+        # Drop a stale active record pointing at the deleted RICE
+        try:
+            name_file = SHADOW_DATA / "active_rice_name"
+            if name_file.exists() and name_file.read_text().strip() == rice_name:
+                name_file.unlink(missing_ok=True)
+        except Exception:
+            pass
         success_box("Rice", f"'{rice_name}' deleted")
         return True
     except Exception as e:
@@ -978,9 +1168,10 @@ def reset_rice_files() -> bool:
     if p10k.exists():
         p10k.unlink()
 
-    # Clear active rice
+    # Clear active rice (link + recorded name, they must stay in sync)
     if ACTIVE_RICE_LINK.exists():
         ACTIVE_RICE_LINK.unlink()
+    (SHADOW_DATA / "active_rice_name").unlink(missing_ok=True)
 
     # Try to restore default rice if available
     default_dir = RICES_DIR / "default"
