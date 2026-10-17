@@ -237,15 +237,65 @@ echo ""
 read -p "  Choice [1]: " choice < /dev/tty
 choice="${choice:-1}"
 
+# Install each module in its own process: a crash in one of them (e.g. a
+# network timeout in shell) must never skip the remaining modules.
+install_modules() {
+    for module in "$@"; do
+        info "Installing module: $module"
+        python3 "$SHADOW_DATA/_lib/cli.py" install "$module" < /dev/tty \
+            || warn "Module '$module' reported problems — continuing with the rest"
+    done
+}
+
 case "$choice" in
-    1) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases < /dev/tty ;;
-    2) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools < /dev/tty ;;
+    1) install_modules shell tools dotfiles aliases ;;
+    2) install_modules shell tools ;;
     3) info "Skipping module install" ;;
-    *) python3 "$SHADOW_DATA/_lib/cli.py" install shell tools dotfiles aliases < /dev/tty ;;
+    *) install_modules shell tools dotfiles aliases ;;
 esac
 
 # Oh My Zsh may have rewritten ~/.zshrc above — make sure PATH survived
 ensure_shell_path
+
+# -----------------------------------------------
+# Shell verification — zsh + Oh My Zsh + login shell
+# -----------------------------------------------
+# A slow network can fail part of the shell module; that must not leave the
+# user stuck on bash. Advisory only: never abort the installer here.
+verify_shell() {
+    if ! command -v zsh &>/dev/null; then
+        warn "zsh is not installed — retry with: sw install shell"
+        return 1
+    fi
+    [ -d "$HOME/.oh-my-zsh" ] \
+        || warn "Oh My Zsh missing (slow network?) — retry with: sw install shell"
+    [ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ] \
+        || warn "Powerlevel10k missing — theme falls back to robbyrussell. Retry: sw install shell"
+    # The framework .zshrc must be in place (or at least source the RICE)
+    if [ -f "$SHADOW_DATA/dotfiles/.zshrc" ] && ! grep -q 'active_rice.sh' "$HOME/.zshrc" 2>/dev/null; then
+        warn "~/.zshrc does not source the RICE — run: sw install dotfiles"
+    fi
+    return 0
+}
+
+# Land in zsh on the next session even when p10k/plugins failed
+ensure_login_shell() {
+    command -v zsh &>/dev/null || return 0
+    case "${SHELL:-}" in
+        */zsh) return 0 ;;
+    esac
+    info "Setting zsh as default shell..."
+    if command -v chsh &>/dev/null && chsh -s zsh 2>/dev/null; then
+        ok "Default shell is now zsh — open a new session (or run: exec zsh)"
+    else
+        warn "Could not change the default shell — run: chsh -s zsh"
+    fi
+}
+
+if [ "$choice" != "3" ]; then
+    verify_shell
+    ensure_login_shell
+fi
 
 # -----------------------------------------------
 # RICE selection — SELECT WHICH ONE TO ACTIVATE

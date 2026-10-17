@@ -7,7 +7,7 @@
 # Core
 # -----------------------------------------------
 export ZSH_DISABLE_COMPFIX=true
-export HISTFILE=/data/data/com.termux/files/home/.zsh_history
+export HISTFILE="$HOME/.zsh_history"
 export HISTSIZE=75000
 export SAVEHIST=75000
 export EDITOR='nano'
@@ -34,12 +34,16 @@ fi
 # -----------------------------------------------
 # Oh My Zsh
 # -----------------------------------------------
+# Theme fallback: a missing p10k must not break the shell with
+# "theme 'powerlevel10k/powerlevel10k' not found"
 if [[ "$SHADOW_DISABLE_P10K" == "true" ]]; then
     ZSH_THEME=""
-else
+elif [[ -f "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
     ZSH_THEME="powerlevel10k/powerlevel10k"
+else
+    ZSH_THEME="robbyrussell"
 fi
-export ZSH="/data/data/com.termux/files/home/.oh-my-zsh"
+export ZSH="$HOME/.oh-my-zsh"
 
 # Suppress p10k wizard when no config exists (e.g. custom-prompt rices)
 [[ ! -f ~/.p10k.zsh ]] && typeset -g POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true

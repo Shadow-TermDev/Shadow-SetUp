@@ -2,44 +2,100 @@
 
 import subprocess
 from _lib.modules import BaseModule
-from _lib.utils import pkg_installed_many
-from _lib.utils.ui import console, success_box, error_box, info_box
+from _lib.utils import run_cmd, pkg_installed, pkg_installed_many
+from _lib.utils.ui import console, success_box, error_box, info_box, warning_box
+
+# Heavy packages (nodejs-lts) on a slow mobile link can take minutes: give
+# pkg enough room so the UI never sits on a silent 120s timeout.
+PKG_TIMEOUT = 300
+
 
 class ToolsModule(BaseModule):
     name = "tools"
     description = "Essential packages (git, curl, bat, eza, fzf, etc.)"
-    
-    PACKAGES = [
+
+    # Everything the framework/RICEs assume is present
+    CRITICAL_PACKAGES = [
         "git", "curl", "wget", "nano",
-        "bat", "eza", "fd", "fzf", "zoxide",
-        "python", "python-pip", "nodejs-lts",
-        "termux-api", "openssh", "man",
+        "python", "python-pip",
     ]
-    
+
+    # Nice to have — a failure here only downgrades the module to a warning
+    OPTIONAL_PACKAGES = [
+        "bat", "eza", "fd", "fzf", "zoxide",
+        "nodejs-lts", "termux-api", "openssh", "man",
+    ]
+
+    @property
+    def PACKAGES(self) -> list[str]:
+        return self.CRITICAL_PACKAGES + self.OPTIONAL_PACKAGES
+
+    def _install_one(self, pkg: str) -> bool:
+        """Install a single package. Never raises."""
+        console.print(f"  [info]Installing {pkg}...[/info]")
+        try:
+            result = run_cmd(["pkg", "install", "-y", pkg], timeout=PKG_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            console.print(
+                f"  [warning]{pkg} timed out after {PKG_TIMEOUT}s — "
+                f"retry later with: pkg install -y {pkg}[/warning]"
+            )
+            return False
+        if result.returncode == 0:
+            success_box("Package", f"{pkg} installed")
+            return True
+        return False
+
     def install(self) -> bool:
         try:
-            from _lib.utils import pkg_installed, run_cmd
             info_box("Installing tools", f"{len(self.PACKAGES)} packages")
-            
+
             installed = 0
             skipped = 0
-            
-            for pkg in self.PACKAGES:
+            failed_critical: list[str] = []
+            failed_optional: list[str] = []
+
+            # Critical first: a slow optional package must never block them
+            for pkg in self.CRITICAL_PACKAGES:
                 if pkg_installed(pkg):
-                    console.print(f"  [warning]{pkg} already installed, skipping...[/warning]")
+                    console.print(f"  [dim]{pkg} already installed, skipping...[/dim]")
                     skipped += 1
+                elif self._install_one(pkg):
+                    installed += 1
                 else:
-                    console.print(f"  [info]Installing {pkg}...[/info]")
-                    result = run_cmd(["pkg", "install", "-y", pkg])
-                    if result.returncode == 0:
-                        success_box("Package", f"{pkg} installed")
-                        installed += 1
-                    else:
-                        console.print(f"  [warning]Failed to install {pkg}[/warning]")
-            
-            success_box("Tools module", f"Installed: {installed}, Skipped: {skipped}")
+                    failed_critical.append(pkg)
+
+            for pkg in self.OPTIONAL_PACKAGES:
+                if pkg_installed(pkg):
+                    console.print(f"  [dim]{pkg} already installed, skipping...[/dim]")
+                    skipped += 1
+                elif self._install_one(pkg):
+                    installed += 1
+                else:
+                    failed_optional.append(pkg)
+                    console.print(
+                        f"  [dim]Optional package {pkg} failed — "
+                        f"retry with: pkg install -y {pkg}[/dim]"
+                    )
+
+            if failed_critical:
+                error_box(
+                    "Tools module",
+                    f"Critical packages failed: {', '.join(failed_critical)}\n"
+                    "  Retry with: sw install tools",
+                )
+                return False
+
+            if failed_optional:
+                warning_box(
+                    "Tools module",
+                    f"Installed: {installed}, Skipped: {skipped} — "
+                    f"optional missing: {', '.join(failed_optional)}",
+                )
+            else:
+                success_box("Tools module", f"Installed: {installed}, Skipped: {skipped}")
             return True
-            
+
         except Exception as e:
             error_box("Tools module", f"Error: {str(e)}")
             return False

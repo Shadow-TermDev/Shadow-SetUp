@@ -1,13 +1,18 @@
 """Dotfiles module — Configuration files."""
 
 import shutil
+import subprocess
 from pathlib import Path
 from _lib.modules import BaseModule
-from _lib.utils import backup_file, TERMUX_HOME, SHADOW_DATA
+from _lib.utils import backup_file, run_cmd, TERMUX_HOME, SHADOW_DATA, SHADOW_CACHE, OH_MY_ZSH
 from _lib.utils.ui import console, success_box, error_box, info_box, warning_box
 
 # Marker used to tell the framework .zshrc apart from a foreign one (OMZ/p10k)
 ZSHRC_MARKERS = ("Shadow-SetUp", "active_rice.sh")
+
+# Framework files + where to fetch them when a partial install wiped them
+RAW_BASE = "https://raw.githubusercontent.com/Shadow-TermDev/Shadow-SetUp/main/dotfiles"
+FRAMEWORK_FILES = (".zshrc", ".nanorc", "aliases.sh")
 
 
 class DotfilesModule(BaseModule):
@@ -15,15 +20,40 @@ class DotfilesModule(BaseModule):
     description = "Configuration files (.zshrc, .p10k.zsh, aliases)"
 
     def _dotfiles_dir(self) -> Path:
-        """Best source for framework dotfiles (installed data or dev checkout)."""
+        """Best source for framework dotfiles (installed data, dev checkout,
+        installer clone cache or a user clone)."""
         candidates = [
             SHADOW_DATA / "dotfiles",
-            Path(__file__).resolve().parents[2] / "dotfiles",
+            Path(__file__).resolve().parents[2] / "dotfiles",  # dev checkout
+            SHADOW_CACHE / "shadow-install" / "dotfiles",      # installer temp clone
+            Path.home() / "Shadow-SetUp" / "dotfiles",         # user clone
         ]
         for candidate in candidates:
             if (candidate / ".zshrc").exists():
                 return candidate
+        # Nothing local — a partial install may have wiped them: fetch from repo
+        self._recover_framework_files(SHADOW_DATA / "dotfiles")
         return SHADOW_DATA / "dotfiles"
+
+    def _recover_framework_files(self, dest: Path) -> bool:
+        """Last resort: download the framework dotfiles from the repo."""
+        console.print("  [warning]Framework dotfiles not found locally — downloading...[/warning]")
+        dest.mkdir(parents=True, exist_ok=True)
+        for name in FRAMEWORK_FILES:
+            target = dest / name
+            if target.exists():
+                continue
+            try:
+                result = run_cmd(
+                    ["curl", "-fsSL", "-o", str(target), f"{RAW_BASE}/{name}"],
+                    timeout=120,
+                )
+            except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+                console.print(f"  [warning]Could not download {name}: {e}[/warning]")
+                result = None
+            if result is None or result.returncode != 0 or not target.exists() or target.stat().st_size == 0:
+                target.unlink(missing_ok=True)
+        return (dest / ".zshrc").exists()
 
     def _is_framework_zshrc(self, path: Path) -> bool:
         """True when the rc file is the Shadow-SetUp one (or wires the RICE up)."""
@@ -89,6 +119,15 @@ class DotfilesModule(BaseModule):
             # Termux MOTD would print its own banner over the RICE greeting
             if remove_motd():
                 console.print("  [dim]Termux MOTD removed[/dim]")
+
+            # p10k powers the framework theme — warn (with the fix) when missing
+            p10k_theme = OH_MY_ZSH / "custom" / "themes" / "powerlevel10k" / "powerlevel10k.zsh-theme"
+            if not p10k_theme.exists():
+                warning_box(
+                    "Dotfiles",
+                    "Powerlevel10k not installed — theme falls back to robbyrussell.\n"
+                    "  Fix with: sw install shell",
+                )
 
             # Reload Termux settings
             try:
